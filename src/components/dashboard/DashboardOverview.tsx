@@ -19,7 +19,6 @@ import { useTraining } from "@/hooks/useTraining";
 import { useAbsences } from "@/hooks/useAbsences";
 import { useSanctionStats } from "@/hooks/useSanctionStats";
 import { formatDateLocal } from "@/utils/dateUtils";
-import { formatDateLocal } from "@/utils/dateUtils";
 
 const DashboardOverview = () => {
   const { employees, getActiveEmployees } = useEmployees();

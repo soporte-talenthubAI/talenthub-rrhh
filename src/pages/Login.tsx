@@ -5,11 +5,12 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Lock, Loader2, Building2 } from 'lucide-react';
+import { Lock, Loader2, Building2, Mail } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { clientConfig } from '@/config/client';
 
 const Login = () => {
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const navigate = useNavigate();
@@ -19,38 +20,67 @@ const Login = () => {
     setIsLoading(true);
     
     try {
-      // Consultar la contraseña desde la base de datos
-      const { data, error } = await (supabase
-        .from('system_config' as any)
-        .select('value')
-        .eq('key', 'app_password')
-        .single() as unknown as Promise<{ data: { value: string } | null; error: any }>);
+      // Usar Supabase Auth
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
 
       if (error) {
-        console.error('Error al verificar contraseña:', error);
+        console.error('Error de autenticación:', error);
+        
+        // Mensajes de error amigables
+        let errorMessage = 'Credenciales incorrectas';
+        if (error.message.includes('Invalid login credentials')) {
+          errorMessage = 'Email o contraseña incorrectos';
+        } else if (error.message.includes('Email not confirmed')) {
+          errorMessage = 'Debe confirmar su email antes de ingresar';
+        }
+        
         toast({
-          title: "Error de conexión",
-          description: "No se pudo verificar la contraseña. Intente nuevamente.",
+          title: "Acceso denegado",
+          description: errorMessage,
           variant: "destructive",
         });
         setIsLoading(false);
         return;
       }
 
-      if (data && password === data.value) {
+      if (data.user) {
+        // Verificar si el usuario está activo
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('is_active, nombre, rol')
+          .eq('id', data.user.id)
+          .single();
+
+        if (profile && !profile.is_active) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Cuenta desactivada",
+            description: "Su cuenta ha sido desactivada. Contacte al administrador.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
+        // Actualizar último acceso
+        await supabase
+          .from('user_profiles')
+          .update({ ultimo_acceso: new Date().toISOString() })
+          .eq('id', data.user.id);
+
+        // Guardar en localStorage para compatibilidad
         localStorage.setItem('authenticated', 'true');
+        localStorage.setItem('user_role', profile?.rol || 'viewer');
+        localStorage.setItem('user_name', profile?.nombre || email);
+        
         toast({
-          title: "Acceso concedido",
-          description: clientConfig.mensajeBienvenida,
+          title: "¡Bienvenido!",
+          description: `Hola ${profile?.nombre || 'Usuario'}`,
         });
         navigate('/');
-      } else {
-        toast({
-          title: "Acceso denegado",
-          description: "Contraseña incorrecta",
-          variant: "destructive",
-        });
-        setPassword('');
       }
     } catch (error) {
       console.error('Error inesperado:', error);
@@ -91,16 +121,35 @@ const Login = () => {
         <CardContent>
           <form onSubmit={handleLogin} className="space-y-4">
             <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <div className="relative">
+                <Mail className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="usuario@empresa.com"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  required
+                  autoFocus
+                  className="pl-10"
+                />
+              </div>
+            </div>
+            <div className="space-y-2">
               <Label htmlFor="password">Contraseña</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="Ingrese la contraseña"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                autoFocus
-              />
+              <div className="relative">
+                <Lock className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  required
+                  className="pl-10"
+                />
+              </div>
             </div>
             <Button type="submit" className="w-full" disabled={isLoading}>
               {isLoading ? (

@@ -31,6 +31,7 @@ import { useBackoffice, TalentHubClient } from "@/hooks/useBackoffice";
 import { supabase } from "@/integrations/supabase/client";
 import TemplateEditor from "@/components/backoffice/TemplateEditor";
 import ClientConfigEditor from "@/components/backoffice/ClientConfigEditor";
+import UserManagement from "@/components/backoffice/UserManagement";
 
 const Backoffice = () => {
   const { toast } = useToast();
@@ -156,7 +157,26 @@ const Backoffice = () => {
     
     const success = await toggleClientModule(selectedClient.id, moduleId, enabled);
     if (success) {
-      setClientModules(prev => ({ ...prev, [moduleId]: enabled }));
+      // Actualizar estado local
+      const newModules = { ...clientModules, [moduleId]: enabled };
+      setClientModules(newModules);
+      
+      // Sincronizar con client_config.modulos_habilitados
+      // Obtener lista de módulos habilitados (incluyendo core modules)
+      const enabledModuleIds = modules
+        .filter(m => m.is_core || newModules[m.id])
+        .map(m => m.key);
+      
+      // Actualizar client_config si existe
+      try {
+        await supabase
+          .from('client_config')
+          .update({ modulos_habilitados: enabledModuleIds })
+          .neq('id', '00000000-0000-0000-0000-000000000000'); // update all
+        console.log('✅ Módulos sincronizados con client_config:', enabledModuleIds);
+      } catch (e) {
+        console.log('⚠️ client_config no existe, solo se actualizó talenthub_client_modules');
+      }
     }
   };
 
@@ -315,6 +335,10 @@ const Backoffice = () => {
             <TabsTrigger value="templates" className="data-[state=active]:bg-emerald-600">
               <FileText className="h-4 w-4 mr-2" />
               Templates
+            </TabsTrigger>
+            <TabsTrigger value="users" className="data-[state=active]:bg-emerald-600">
+              <Users className="h-4 w-4 mr-2" />
+              Usuarios
             </TabsTrigger>
             <TabsTrigger value="config" className="data-[state=active]:bg-emerald-600">
               <Settings className="h-4 w-4 mr-2" />
@@ -566,42 +590,95 @@ const Backoffice = () => {
                         Configuración: {selectedClient.nombre}
                       </CardTitle>
                       <CardDescription className="text-slate-400">
-                        Gestiona los módulos habilitados para este cliente
+                        Plan actual: <span className="font-semibold text-emerald-400">{selectedClient.plan.toUpperCase()}</span>
                       </CardDescription>
                     </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setSelectedClient(null)}
-                      className="text-slate-400"
-                    >
-                      Cerrar
-                    </Button>
+                    <div className="flex items-center gap-3">
+                      <Select
+                        value={selectedClient.plan}
+                        onValueChange={async (newPlan) => {
+                          await updateClient(selectedClient.id, { plan: newPlan as any });
+                          setSelectedClient({ ...selectedClient, plan: newPlan as any });
+                        }}
+                      >
+                        <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="basic">Basic</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="enterprise">Enterprise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setSelectedClient(null)}
+                        className="text-slate-400"
+                      >
+                        Cerrar
+                      </Button>
+                    </div>
                   </div>
                 </CardHeader>
                 <CardContent>
+                  {/* Leyenda de planes */}
+                  <div className="flex gap-4 mb-4 text-xs">
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-500"></span> Basic</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500"></span> Professional</span>
+                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500"></span> Enterprise</span>
+                  </div>
+                  
                   <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {modules.map((module) => (
-                      <div
-                        key={module.id}
-                        className="flex items-center justify-between p-4 rounded-lg bg-slate-700/50 border border-slate-600"
-                      >
-                        <div>
-                          <p className="font-medium text-white">{module.nombre}</p>
-                          <p className="text-sm text-slate-400">{module.descripcion}</p>
-                          {module.is_core && (
-                            <Badge variant="secondary" className="mt-1 text-xs">
-                              Core
-                            </Badge>
-                          )}
+                    {modules.map((module) => {
+                      // Verificar si el módulo está disponible para el plan del cliente
+                      const planOrder = { basic: 1, professional: 2, enterprise: 3 };
+                      const moduleMinPlan = module.plan_minimo || 'basic';
+                      const clientPlan = selectedClient.plan || 'basic';
+                      const isAvailableForPlan = planOrder[clientPlan as keyof typeof planOrder] >= planOrder[moduleMinPlan as keyof typeof planOrder];
+                      
+                      // Color según plan mínimo
+                      const planColors = {
+                        basic: 'border-slate-500',
+                        professional: 'border-blue-500',
+                        enterprise: 'border-purple-500',
+                      };
+                      
+                      return (
+                        <div
+                          key={module.id}
+                          className={`flex items-center justify-between p-4 rounded-lg bg-slate-700/50 border-2 ${planColors[moduleMinPlan as keyof typeof planColors] || 'border-slate-600'} ${!isAvailableForPlan ? 'opacity-50' : ''}`}
+                        >
+                          <div>
+                            <p className="font-medium text-white">{module.nombre}</p>
+                            <p className="text-sm text-slate-400">{module.descripcion}</p>
+                            <div className="flex gap-1 mt-1">
+                              {module.is_core && (
+                                <Badge variant="secondary" className="text-xs">
+                                  Core
+                                </Badge>
+                              )}
+                              <Badge 
+                                variant="outline" 
+                                className={`text-xs ${
+                                  moduleMinPlan === 'enterprise' ? 'border-purple-500 text-purple-400' :
+                                  moduleMinPlan === 'professional' ? 'border-blue-500 text-blue-400' :
+                                  'border-slate-500 text-slate-400'
+                                }`}
+                              >
+                                {moduleMinPlan}
+                              </Badge>
+                            </div>
+                          </div>
+                          <Switch
+                            checked={clientModules[module.id] ?? module.is_core}
+                            onCheckedChange={(checked) => handleToggleModule(module.id, checked)}
+                            disabled={module.is_core || !isAvailableForPlan}
+                            title={!isAvailableForPlan ? `Requiere plan ${moduleMinPlan}` : ''}
+                          />
                         </div>
-                        <Switch
-                          checked={clientModules[module.id] ?? module.is_core}
-                          onCheckedChange={(checked) => handleToggleModule(module.id, checked)}
-                          disabled={module.is_core}
-                        />
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </CardContent>
               </Card>
@@ -648,6 +725,11 @@ const Backoffice = () => {
           {/* Templates Tab */}
           <TabsContent value="templates">
             <TemplateEditor />
+          </TabsContent>
+
+          {/* Usuarios Tab */}
+          <TabsContent value="users">
+            <UserManagement />
           </TabsContent>
 
           {/* Config Cliente Tab */}

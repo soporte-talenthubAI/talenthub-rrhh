@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
@@ -18,6 +18,7 @@ import {
   FileText,
   AlertCircle
 } from "lucide-react";
+import { getClientConfig } from "@/config/client";
 
 interface SidebarProps {
   activeModule: string;
@@ -121,6 +122,22 @@ const modules = [
 
 const Sidebar = ({ activeModule, onModuleChange }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
+  const [enabledModules, setEnabledModules] = useState<string[]>([]);
+
+  // Cargar módulos habilitados desde la configuración del cliente
+  useEffect(() => {
+    const config = getClientConfig();
+    // Si hay módulos configurados, usar esos; sino mostrar todos (desarrollo)
+    if (config.modulosHabilitados && config.modulosHabilitados.length > 0) {
+      setEnabledModules(config.modulosHabilitados);
+    } else {
+      // Fallback: mostrar todos los módulos
+      setEnabledModules(modules.map(m => m.id));
+    }
+  }, []);
+
+  // Filtrar módulos según configuración
+  const visibleModules = modules.filter(m => enabledModules.includes(m.id));
 
   return (
     <div className={cn(
@@ -147,7 +164,7 @@ const Sidebar = ({ activeModule, onModuleChange }: SidebarProps) => {
         </div>
 
         <nav className="flex-1 space-y-2 p-4">
-          {modules.map((module) => {
+          {visibleModules.map((module) => {
             const Icon = module.icon;
             const isActive = activeModule === module.id;
             
