@@ -22,12 +22,16 @@ export const useAttendance = () => {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
+      // Calcular el próximo mes correctamente (manejar diciembre -> enero)
+      const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
+      const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
+      
       // Get attendance records for current month
       const { data: attendanceData, error } = await supabase
         .from('attendance')
         .select('*')
         .gte('fecha', `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`)
-        .lt('fecha', `${currentYear}-${String(currentMonth + 1).padStart(2, '0')}-01`);
+        .lt('fecha', `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`);
 
       if (error) {
         console.error('Error fetching attendance data:', error);
