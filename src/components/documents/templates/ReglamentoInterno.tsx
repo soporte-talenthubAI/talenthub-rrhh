@@ -1,4 +1,5 @@
 import React from "react";
+import { clientConfig } from "@/config/client";
 
 interface ReglamentoInternoProps {
   employeeName: string;
@@ -40,7 +41,7 @@ const ReglamentoInterno = React.forwardRef<
           textTransform: "uppercase",
           marginBottom: "32px"
         }}>
-          AVÍCOLA LA PALOMA
+          {clientConfig.nombre.toUpperCase()}
         </h2>
 
         <p style={{ marginBottom: "8px" }}>
@@ -233,7 +234,7 @@ const ReglamentoInterno = React.forwardRef<
         }}>
           Este Reglamento Interno entra en vigencia a partir de su comunicación a
           los empleados y deberá ser conocido, respetado y cumplido por todos los
-          integrantes de Avícola La Paloma.
+          integrantes de {clientConfig.nombre}.
         </p>
 
         <div style={{ marginTop: "40px" }}>

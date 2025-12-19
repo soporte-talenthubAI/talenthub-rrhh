@@ -1,4 +1,5 @@
 import React from 'react';
+import { clientConfig } from '@/config/client';
 
 interface DespidoPeriodoPruebaTemplateProps {
   employeeData: {
@@ -31,12 +32,12 @@ export const DespidoPeriodoPruebaTemplate = React.forwardRef<
       {/* Encabezado */}
       <div style={{ textAlign: 'center', marginBottom: '30px' }}>
         <h1 style={{ fontSize: '16px', fontWeight: 'bold', margin: '0 0 10px 0' }}>
-          Avícola La Paloma
+          {clientConfig.nombre}
         </h1>
-        <p style={{ margin: '0 0 7px 0', fontSize: '10px' }}>20-24088189-7</p>
-        <p style={{ margin: '0 0 20px 0', fontSize: '10px' }}>
-          Av. José Hernández 90 – Río Primero
-        </p>
+        {clientConfig.cuit && <p style={{ margin: '0 0 7px 0', fontSize: '10px' }}>{clientConfig.cuit}</p>}
+        {clientConfig.direccion && <p style={{ margin: '0 0 20px 0', fontSize: '10px' }}>
+          {clientConfig.direccion}
+        </p>}
       </div>
 
       {/* Lugar y Fecha */}

@@ -4,6 +4,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { MapPin, Phone, Briefcase, Calendar, FileText } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Eye, Trash2 } from "lucide-react";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface Application {
   id: string;
@@ -128,7 +129,7 @@ export const ApplicationCard = ({ application, onView, onDelete, onDownloadCV }:
             )}
             <div className="flex items-center gap-1 min-w-0">
               <Calendar className="h-3 w-3 shrink-0" />
-              <span className="truncate">{new Date(application.created_at).toLocaleDateString()}</span>
+              <span className="truncate">{formatDateLocal(application.created_at)}</span>
             </div>
             {application.has_transport && (
               <div className="flex items-center gap-1 min-w-0">

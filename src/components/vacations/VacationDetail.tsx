@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface VacationDetailProps {
   vacation: any;
@@ -109,17 +110,17 @@ const VacationDetail = ({ vacation, onBack, onApprove, onReject, onGeneratePDF }
 
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha de Solicitud</p>
-              <p className="text-foreground">{new Date(vacation.fechaSolicitud).toLocaleDateString()}</p>
+              <p className="text-foreground">{formatDateLocal(vacation.fechaSolicitud)}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha de Inicio</p>
-              <p className="text-foreground font-semibold">{new Date(vacation.fechaInicio).toLocaleDateString()}</p>
+              <p className="text-foreground font-semibold">{formatDateLocal(vacation.fechaInicio)}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha de Fin</p>
-              <p className="text-foreground font-semibold">{new Date(vacation.fechaFin).toLocaleDateString()}</p>
+              <p className="text-foreground font-semibold">{formatDateLocal(vacation.fechaFin)}</p>
             </div>
             
             <div>

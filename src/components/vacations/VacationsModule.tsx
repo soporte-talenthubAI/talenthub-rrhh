@@ -11,6 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const VacationsModule = () => {
   const { toast } = useToast();
@@ -160,8 +161,8 @@ const VacationsModule = () => {
     try {
       const empleadoNombre = vacation.empleadoNombre || "Empleado";
       const dni = vacation.empleadoDni || "";
-      const inicio = vacation.fechaInicio ? new Date(vacation.fechaInicio).toLocaleDateString("es-AR") : "";
-      const fin = vacation.fechaFin ? new Date(vacation.fechaFin).toLocaleDateString("es-AR") : "";
+      const inicio = vacation.fechaInicio ? formatDateLocal(vacation.fechaInicio) : "";
+      const fin = vacation.fechaFin ? formatDateLocal(vacation.fechaFin) : "";
       const emitido = new Date().toLocaleDateString("es-AR");
       const motivo = vacation.motivo || "Vacaciones";
       const dias = vacation.diasSolicitados || 0;
@@ -272,7 +273,7 @@ const VacationsModule = () => {
         <tr>
           <td style="padding:6px 8px; border:1px solid #ddd;">${v.empleadoNombre}</td>
           <td style="padding:6px 8px; border:1px solid #ddd;">${v.periodo}</td>
-          <td style="padding:6px 8px; border:1px solid #ddd;">${new Date(v.fechaInicio).toLocaleDateString("es-AR")} - ${new Date(v.fechaFin).toLocaleDateString("es-AR")}</td>
+          <td style="padding:6px 8px; border:1px solid #ddd;">${formatDateLocal(v.fechaInicio)} - ${formatDateLocal(v.fechaFin)}</td>
           <td style="padding:6px 8px; border:1px solid #ddd; text-align:center;">${v.diasSolicitados}</td>
           <td style="padding:6px 8px; border:1px solid #ddd; text-transform:capitalize;">${v.estado}</td>
         </tr>
@@ -529,11 +530,11 @@ const VacationsModule = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground/70">Fecha Inicio</p>
-                      <p className="text-foreground">{new Date(vacation.fechaInicio).toLocaleDateString()}</p>
+                      <p className="text-foreground">{formatDateLocal(vacation.fechaInicio)}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground/70">Fecha Fin</p>
-                      <p className="text-foreground">{new Date(vacation.fechaFin).toLocaleDateString()}</p>
+                      <p className="text-foreground">{formatDateLocal(vacation.fechaFin)}</p>
                     </div>
                   </div>
                   

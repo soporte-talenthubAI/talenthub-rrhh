@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, TrendingUp, Award, Target } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface PerformanceDetailProps {
   evaluation: any;
@@ -86,7 +87,7 @@ const PerformanceDetail = ({ evaluation, onBack }: PerformanceDetailProps) => {
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha de Evaluación</p>
-              <p className="text-foreground">{new Date(evaluation.fechaEvaluacion).toLocaleDateString()}</p>
+              <p className="text-foreground">{formatDateLocal(evaluation.fechaEvaluacion)}</p>
             </div>
 
             <div className="flex items-center justify-between">

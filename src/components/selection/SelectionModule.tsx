@@ -11,6 +11,7 @@ import { Search, Download } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { ApplicationCard } from './ApplicationCard';
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface Application {
   id: string;
@@ -173,7 +174,7 @@ export const SelectionModule = () => {
         app.phone || '',
         app.position || '',
         app.education || '',
-        new Date(app.created_at).toLocaleDateString()
+        formatDateLocal(app.created_at)
       ].join(','))
     ].join('\n');
 
@@ -362,7 +363,7 @@ export const SelectionModule = () => {
                   <Label>Información Personal</Label>
                   <div className="space-y-2 mt-2">
                     <p><strong>Nombre:</strong> {selectedApplication.full_name}</p>
-                    <p><strong>Fecha de nacimiento:</strong> {new Date(selectedApplication.birth_date).toLocaleDateString()}</p>
+                    <p><strong>Fecha de nacimiento:</strong> {formatDateLocal(selectedApplication.birth_date)}</p>
                     <p><strong>Edad:</strong> {getAge(selectedApplication.birth_date)} años</p>
                     <p><strong>Teléfono:</strong> {selectedApplication.phone}</p>
                     <p><strong>Educación:</strong> {selectedApplication.education}</p>

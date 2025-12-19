@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Download, FileText, User, MapPin, Phone, Mail, GraduationCap, Heart, Briefcase } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { formatDateLocal, calculateDetailedAntiquity, getCurrentDateString } from "@/utils/dateUtils";
+import { clientConfig } from "@/config/client";
 
 interface LegajoPDFProps {
   employeeData: any;
@@ -107,7 +108,7 @@ const downloadPDF = async () => {
           {/* Header del Legajo */}
           <div className="text-center border-b-2 pb-4" style={{ borderColor: '#e5e7eb' }}>
             <h1 className="text-2xl font-bold mb-2" style={{ color: '#1f2937' }}>LEGAJO DIGITAL DE EMPLEADO</h1>
-            <h2 className="text-lg font-semibold" style={{ color: '#4b5563' }}>AVÍCOLA LA PALOMA</h2>
+            <h2 className="text-lg font-semibold" style={{ color: '#4b5563' }}>{clientConfig.nombre.toUpperCase()}</h2>
             <p className="text-sm mt-2" style={{ color: '#6b7280' }}>
               Fecha de Generación: {formatDateLocal(getCurrentDateString())}
             </p>
@@ -360,7 +361,7 @@ const downloadPDF = async () => {
               Este documento constituye el legajo digital del empleado según normativas laborales vigentes.
             </p>
             <p className="mt-1">
-              Generado el {formatDateLocal(getCurrentDateString())} - Sistema RRHH Avícola La Paloma
+              Generado el {formatDateLocal(getCurrentDateString())} - Sistema RRHH {clientConfig.nombre}
             </p>
           </div>
         </div>

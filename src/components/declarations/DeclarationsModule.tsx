@@ -12,6 +12,7 @@ import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
 import { useEmployees } from "@/hooks/useEmployees";
 import html2pdf from 'html2pdf.js';
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface DeclaracionDomicilio {
   id: string;
@@ -149,7 +150,7 @@ const DeclarationsModule = () => {
           <p><strong>Dirección:</strong> ${declaration.domicilio}</p>
           ${declaration.calle_paralela_1 ? `<p><strong>Calle Paralela 1:</strong> ${declaration.calle_paralela_1}</p>` : ''}
           ${declaration.calle_paralela_2 ? `<p><strong>Calle Paralela 2:</strong> ${declaration.calle_paralela_2}</p>` : ''}
-          <p><strong>Fecha de Declaración:</strong> ${new Date(declaration.fecha_declaracion).toLocaleDateString('es-AR')}</p>
+          <p><strong>Fecha de Declaración:</strong> ${formatDateLocal(declaration.fecha_declaracion)}</p>
           ${employee?.dni ? `<p><strong>DNI:</strong> ${employee.dni}</p>` : ''}
         </div>
 
@@ -384,7 +385,7 @@ const DeclarationsModule = () => {
                         )}
                       </TableCell>
                       <TableCell>
-                        {new Date(declaration.fecha_declaracion).toLocaleDateString('es-AR')}
+                        {formatDateLocal(declaration.fecha_declaracion)}
                       </TableCell>
                       <TableCell>
                         <div className="flex gap-2">

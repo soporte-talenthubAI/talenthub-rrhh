@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Download, Users, Clock, CheckCircle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const CalendarList = () => {
   const { toast } = useToast();
@@ -136,7 +137,7 @@ const CalendarList = () => {
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="font-medium text-foreground">{new Date(event.date).toLocaleDateString()}</p>
+                    <p className="font-medium text-foreground">{formatDateLocal(event.date)}</p>
                     <Badge variant={
                       event.type === "vacation" ? "success" :
                       event.type === "training" ? "warning" : "default"

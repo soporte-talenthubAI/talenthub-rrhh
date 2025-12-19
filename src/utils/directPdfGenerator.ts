@@ -1,5 +1,8 @@
 import { jsPDF } from 'jspdf';
 import { supabase } from "@/integrations/supabase/client";
+import { clientConfig } from "@/config/client";
+import { formatDateLocal } from "@/utils/dateUtils";
+import { generateDynamicPDF, DynamicPDFParams } from "@/utils/dynamicPdfGenerator";
 
 export interface GeneratePDFParams {
   documentType: string;
@@ -9,6 +12,9 @@ export interface GeneratePDFParams {
     dni: string;
     direccion?: string;
     cuil?: string;
+    puesto?: string;
+    departamento?: string;
+    fecha_ingreso?: string;
     employee?: any;
     sanction?: any;
   };
@@ -22,6 +28,7 @@ export interface PDFGenerationResult {
   url?: string;
   error?: string;
   blob?: Blob;
+  usedDynamicTemplate?: boolean;
 }
 
 export interface SignPDFParams {
@@ -31,14 +38,62 @@ export interface SignPDFParams {
   signedDate: string;
 }
 
-// Función que genera PDF directamente con jsPDF - SIN html2pdf
+// Función que genera PDF - INTENTA USAR TEMPLATES DINÁMICOS PRIMERO
 export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PDFGenerationResult> => {
   const { documentType, employeeData, generatedDate, documentId } = params;
   
   const isPreview = documentId.startsWith('preview_');
-  // Generating PDF with jsPDF
+  console.log('📄 [PDF Generator] Iniciando generación:', documentType, isPreview ? '(PREVIEW)' : '(GUARDAR)');
 
   try {
+    // 1. INTENTAR USAR GENERADOR DINÁMICO PRIMERO
+    try {
+      console.log('🔄 [PDF Generator] Intentando usar templates dinámicos...');
+      
+      // Extraer datos de sanción si existe
+      const sanction = employeeData.sanction;
+      const sanctionData: DynamicPDFParams['sanction'] = sanction ? {
+        motivo: sanction.motivo,
+        fecha_hecho: sanction.fecha_hecho,
+        lugar_hecho: sanction.lugar_hecho,
+        dias_suspension: sanction.dias_suspension,
+        fecha_inicio: sanction.fecha_inicio,
+        fecha_reincorporacion: sanction.fecha_reincorporacion,
+      } : undefined;
+      
+      const dynamicResult = await generateDynamicPDF({
+        templateType: documentType,
+        employeeData: {
+          nombres: employeeData.nombres,
+          apellidos: employeeData.apellidos,
+          dni: employeeData.dni,
+          direccion: employeeData.direccion,
+          cuil: employeeData.cuil,
+          puesto: employeeData.puesto || employeeData.employee?.puesto,
+          departamento: employeeData.departamento || employeeData.employee?.departamento,
+          fecha_ingreso: employeeData.fecha_ingreso || employeeData.employee?.fecha_ingreso,
+        },
+        documentId,
+        sanction: sanctionData,
+      });
+      
+      if (dynamicResult.success) {
+        console.log('✅ [PDF Generator] PDF generado con sistema dinámico', 
+          dynamicResult.usedDynamicTemplate ? '(template BD)' : '(fallback jsPDF)');
+        return {
+          success: true,
+          pdfUrl: dynamicResult.pdfUrl,
+          url: dynamicResult.pdfUrl,
+          blob: dynamicResult.blob,
+          usedDynamicTemplate: dynamicResult.usedDynamicTemplate,
+        };
+      }
+    } catch (error) {
+      console.warn('⚠️ [PDF Generator] Error en generador dinámico, usando método legacy:', error);
+    }
+    
+    // 2. FALLBACK: MÉTODO LEGACY CON JSPDF DIRECTO
+    console.log('🔄 [PDF Generator] Usando método legacy (jsPDF directo)');
     // Validar que los datos necesarios estén presentes
     if (!employeeData || !employeeData.nombres || !employeeData.apellidos) {
       throw new Error(`Datos del empleado incompletos: ${JSON.stringify(employeeData)}`);
@@ -93,7 +148,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       yPos += 15;
       
       doc.setFontSize(12);
-      const camarasIntro = 'El/la trabajador/a declara haber sido informado/a de la existencia de cámaras de seguridad instaladas en las instalaciones de la empresa Avícola La Paloma (en adelante "la Empresa"), cuya finalidad exclusiva es la prevención de riesgos, seguridad de las personas, resguardo de bienes materiales y control del cumplimiento de normas laborales.';
+      const camarasIntro = `El/la trabajador/a declara haber sido informado/a de la existencia de cámaras de seguridad instaladas en las instalaciones de la empresa ${clientConfig.nombre} (en adelante "la Empresa"), cuya finalidad exclusiva es la prevención de riesgos, seguridad de las personas, resguardo de bienes materiales y control del cumplimiento de normas laborales.`;
       const splitCamarasIntro = doc.splitTextToSize(camarasIntro, 170);
       doc.text(splitCamarasIntro, 20, yPos);
       yPos += splitCamarasIntro.length * 5 + 8;
@@ -208,7 +263,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       doc.text('REGLAMENTO INTERNO', 105, yPos, { align: 'center' });
       yPos += 15;
       doc.setFontSize(16);
-      doc.text('AVÍCOLA LA PALOMA', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre.toUpperCase(), 105, yPos, { align: 'center' });
       yPos += 20;
       
       doc.setFontSize(12);
@@ -348,7 +403,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       
       // ENCABEZADO
       doc.setFontSize(14);
-      doc.text('AVICOLA LA PALOMA', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre.toUpperCase(), 105, yPos, { align: 'center' });
       yPos += 15;
       
       doc.setFontSize(12);
@@ -382,7 +437,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       doc.text(`Córdoba, ${formattedDate}.`, 20, yPos);
       yPos += 18;
       
-      doc.text('AVICOLA LA PALOMA', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre.toUpperCase(), 105, yPos, { align: 'center' });
       yPos += 25;
       
       // FIRMA
@@ -406,7 +461,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       
       // ENCABEZADO
       doc.setFontSize(16);
-      doc.text('Avícola La Paloma', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre, 105, yPos, { align: 'center' });
       yPos += 10;
       
       doc.setFontSize(10);
@@ -477,7 +532,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       
       // ENCABEZADO
       doc.setFontSize(14);
-      doc.text('AVICOLA LA PALOMA', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre.toUpperCase(), 105, yPos, { align: 'center' });
       yPos += 15;
       
       doc.setFontSize(12);
@@ -500,7 +555,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       doc.text(splitMotivo, 20, yPos);
       yPos += splitMotivo.length * 4 + 6;
       
-      const suspension = `Por ello, se le aplican ${sanction.dias_suspension} días de suspensión sin goce de haberes, a partir del día ${new Date(sanction.fecha_inicio).toLocaleDateString('es-AR')}, debiendo reincorporarse el día ${new Date(sanction.fecha_reincorporacion).toLocaleDateString('es-AR')}.`;
+      const suspension = `Por ello, se le aplican ${sanction.dias_suspension} días de suspensión sin goce de haberes, a partir del día ${formatDateLocal(sanction.fecha_inicio)}, debiendo reincorporarse el día ${formatDateLocal(sanction.fecha_reincorporacion)}.`;
       const splitSuspension = doc.splitTextToSize(suspension, 170);
       doc.text(splitSuspension, 20, yPos);
       yPos += splitSuspension.length * 4 + 6;
@@ -516,7 +571,7 @@ export const generatePDFDirectly = async (params: GeneratePDFParams): Promise<PD
       doc.text(`Córdoba, ${formattedDate}.`, 20, yPos);
       yPos += 18;
       
-      doc.text('AVICOLA LA PALOMA', 105, yPos, { align: 'center' });
+      doc.text(clientConfig.nombre.toUpperCase(), 105, yPos, { align: 'center' });
       yPos += 25;
       
       // FIRMA

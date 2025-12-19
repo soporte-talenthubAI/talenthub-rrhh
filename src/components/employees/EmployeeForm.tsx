@@ -12,6 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import LegajoPDF from "./LegajoPDF";
 import { calculateDetailedAntiquity } from "@/utils/dateUtils";
 
+// Constantes para validaciones de edad
+const EDAD_MINIMA_LEGAL = 18;
+const EDAD_MAXIMA_RAZONABLE = 110;
+
 interface EmployeeFormProps {
   onBack: () => void;
   onSave?: (employee: any) => void;
@@ -165,14 +169,99 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
   };
 
   const handleSave = () => {
-    // Validaciones básicas
-    if (!formData.nombres || !formData.apellidos || !formData.dni || !formData.fechaIngreso) {
+    // Validación: Nombres
+    if (!formData.nombres?.trim()) {
       toast({
-        title: "Error",
-        description: "Por favor complete los campos obligatorios (Nombres, Apellidos, DNI, Fecha de Ingreso)",
+        title: "Falta completar el nombre",
+        description: "Por favor ingrese el nombre del empleado antes de guardar.",
         variant: "destructive"
       });
       return;
+    }
+
+    // Validación: Apellidos
+    if (!formData.apellidos?.trim()) {
+      toast({
+        title: "Falta completar el apellido",
+        description: "Por favor ingrese el apellido del empleado antes de guardar.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validación: DNI
+    if (!formData.dni?.trim()) {
+      toast({
+        title: "Falta completar el DNI",
+        description: "Por favor ingrese el número de documento del empleado.",
+        variant: "destructive"
+      });
+      return;
+    } else if (!/^\d+$/.test(formData.dni)) {
+      toast({
+        title: "DNI inválido",
+        description: "El DNI solo debe contener números (sin puntos ni letras).",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validación: Fecha de ingreso
+    if (!formData.fechaIngreso) {
+      toast({
+        title: "Falta seleccionar la fecha de ingreso",
+        description: "Por favor elija la fecha en la que el empleado ingresó a la empresa.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Validación: Fecha de ingreso no puede ser futura
+    if (formData.fechaIngreso) {
+      const fechaIngreso = new Date(formData.fechaIngreso);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+
+      if (fechaIngreso > hoy) {
+        toast({
+          title: "Fecha inválida",
+          description: "La fecha de ingreso no puede ser una fecha futura.",
+          variant: "destructive"
+        });
+        return;
+      }
+    }
+
+    // Validación de Fecha de Nacimiento y Edad
+    if (formData.fechaNacimiento) {
+      const fechaNac = new Date(formData.fechaNacimiento);
+      const hoy = new Date();
+      hoy.setHours(0, 0, 0, 0);
+      
+      // Calcular edad exacta
+      let edad = hoy.getFullYear() - fechaNac.getFullYear();
+      const diferenciaMeses = hoy.getMonth() - fechaNac.getMonth();
+      if (diferenciaMeses < 0 || (diferenciaMeses === 0 && hoy.getDate() < fechaNac.getDate())) {
+        edad--;
+      }
+
+      if (edad < EDAD_MINIMA_LEGAL) {
+        toast({
+          title: "Error: Edad insuficiente",
+          description: `El empleado debe tener al menos ${EDAD_MINIMA_LEGAL} años. Edad actual: ${edad} años`,
+          variant: "destructive"
+        });
+        return;
+      }
+
+      if (edad > EDAD_MAXIMA_RAZONABLE) {
+        toast({
+          title: "Error en Fecha de Nacimiento",
+          description: "La fecha de nacimiento ingresada no es válida. Por favor verifique los datos",
+          variant: "destructive"
+        });
+        return;
+      }
     }
 
     // Guardar en lista (padre)
@@ -311,6 +400,7 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                   type="date"
                   value={formData.fechaNacimiento}
                   onChange={(e) => handleInputChange("fechaNacimiento", e.target.value)}
+                  max={new Date().toISOString().split('T')[0]}
                 />
               </div>
               <div>
@@ -406,7 +496,7 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                 type="email"
                 value={formData.email}
                 onChange={(e) => handleInputChange("email", e.target.value)}
-                placeholder="empleado@avicolapaloma.com"
+                placeholder="empleado@empresa.com"
               />
             </div>
 
@@ -515,6 +605,7 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                 type="date"
                 value={formData.fechaIngreso}
                 onChange={(e) => handleInputChange("fechaIngreso", e.target.value)}
+                max={new Date().toISOString().split("T")[0]}
                 required
               />
             </div>

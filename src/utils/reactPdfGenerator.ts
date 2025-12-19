@@ -4,6 +4,8 @@ import { createRoot } from "react-dom/client";
 import { supabase } from "@/integrations/supabase/client";
 import ConsentimientoSimple from "@/components/documents/templates/ConsentimientoSimple";
 import ReglamentoInternoSimple from "@/components/documents/templates/ReglamentoInternoSimple";
+import { clientConfig } from "@/config/client";
+import { generateDynamicPDF, DynamicPDFParams } from "@/utils/dynamicPdfGenerator";
 
 export interface GeneratePDFParams {
   documentType: string;
@@ -12,9 +14,17 @@ export interface GeneratePDFParams {
     apellidos: string;
     dni: string;
     direccion?: string;
+    cuil?: string;
+    puesto?: string;
+    departamento?: string;
+    fecha_ingreso?: string;
   };
   generatedDate: string;
   documentId: string;
+  // Datos adicionales para documentos específicos
+  sanction?: DynamicPDFParams['sanction'];
+  vacation?: DynamicPDFParams['vacation'];
+  training?: DynamicPDFParams['training'];
 }
 
 export interface PDFGenerationResult {
@@ -22,6 +32,7 @@ export interface PDFGenerationResult {
   pdfUrl?: string;
   error?: string;
   blob?: Blob;
+  usedDynamicTemplate?: boolean;
 }
 
 export interface SignPDFParams {
@@ -32,11 +43,51 @@ export interface SignPDFParams {
 }
 
 // Función compartida para generar PDF usando componentes React
+// Ahora intenta primero usar templates dinámicos de la BD
 export const generatePDFFromReactComponents = async (params: GeneratePDFParams): Promise<PDFGenerationResult> => {
-  const { documentType, employeeData, generatedDate, documentId } = params;
+  const { documentType, employeeData, generatedDate, documentId, sanction, vacation, training } = params;
   
   const isPreview = documentId.startsWith('preview_');
-  console.log('🚀 [REACT PDF] Generando PDF con componentes React', isPreview ? '(PREVIEW)' : '(GUARDAR)');
+  console.log('🚀 [PDF Generator] Iniciando generación', isPreview ? '(PREVIEW)' : '(GUARDAR)');
+  
+  // 1. INTENTAR USAR GENERADOR DINÁMICO PRIMERO
+  try {
+    console.log('📄 [PDF Generator] Intentando usar templates dinámicos...');
+    
+    const dynamicResult = await generateDynamicPDF({
+      templateType: documentType,
+      employeeData: {
+        nombres: employeeData.nombres,
+        apellidos: employeeData.apellidos,
+        dni: employeeData.dni,
+        direccion: employeeData.direccion,
+        cuil: employeeData.cuil,
+        puesto: employeeData.puesto,
+        departamento: employeeData.departamento,
+        fecha_ingreso: employeeData.fecha_ingreso,
+      },
+      documentId,
+      sanction,
+      vacation,
+      training,
+    });
+    
+    if (dynamicResult.success) {
+      console.log('✅ [PDF Generator] PDF generado con sistema dinámico', 
+        dynamicResult.usedDynamicTemplate ? '(template BD)' : '(fallback jsPDF)');
+      return {
+        success: true,
+        pdfUrl: dynamicResult.pdfUrl,
+        blob: dynamicResult.blob,
+        usedDynamicTemplate: dynamicResult.usedDynamicTemplate,
+      };
+    }
+  } catch (error) {
+    console.warn('⚠️ [PDF Generator] Error en generador dinámico, usando método legacy:', error);
+  }
+  
+  // 2. FALLBACK: MÉTODO LEGACY CON REACT COMPONENTS
+  console.log('🔄 [PDF Generator] Usando método legacy (React components)');
 
   try {
     // Crear div temporal COMPLETAMENTE VISIBLE para html2canvas
@@ -185,7 +236,7 @@ export const generatePDFFromReactComponents = async (params: GeneratePDFParams):
         fallbackDoc.text(`${employeeName}, DNI N° ${employeeData.dni}, quien manifiesta`, 20, 155);
         fallbackDoc.text('prestar su consentimiento expreso para el uso de camaras de', 20, 170);
         fallbackDoc.text('vigilancia y datos biometricos en las instalaciones de', 20, 185);
-        fallbackDoc.text('Avicola La Paloma.', 20, 200);
+        fallbackDoc.text('la empresa.', 20, 200);
         
         fallbackDoc.text('Firma del empleado:', 20, 240);
         fallbackDoc.text('_________________________', 20, 260);
@@ -198,7 +249,7 @@ export const generatePDFFromReactComponents = async (params: GeneratePDFParams):
         fallbackDoc.setFontSize(18);
         fallbackDoc.text('REGLAMENTO INTERNO', 20, 30);
         fallbackDoc.setFontSize(16);
-        fallbackDoc.text('AVICOLA LA PALOMA', 20, 50);
+        fallbackDoc.text(clientConfig.nombre.toUpperCase(), 20, 50);
         
         fallbackDoc.setFontSize(12);
         fallbackDoc.text(`Fecha: ${formattedDate}`, 20, 75);

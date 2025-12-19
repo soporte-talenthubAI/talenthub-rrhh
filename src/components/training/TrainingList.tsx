@@ -11,6 +11,7 @@ import TrainingDetail from "./TrainingDetail";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useTrainings } from "@/hooks/useTrainings";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const TrainingList = () => {
   const { toast } = useToast();
@@ -284,7 +285,7 @@ const TrainingList = () => {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-sm font-medium text-foreground/70">Fecha</p>
-                    <p className="text-foreground">{new Date(training.fecha).toLocaleDateString()}</p>
+                    <p className="text-foreground">{formatDateLocal(training.fecha)}</p>
                   </div>
                   <div>
                     <p className="text-sm font-medium text-foreground/70">Duración</p>

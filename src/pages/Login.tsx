@@ -5,8 +5,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { toast } from '@/hooks/use-toast';
-import { Lock, Loader2 } from 'lucide-react';
+import { Lock, Loader2, Building2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { clientConfig } from '@/config/client';
 
 const Login = () => {
   const [password, setPassword] = useState('');
@@ -40,7 +41,7 @@ const Login = () => {
         localStorage.setItem('authenticated', 'true');
         toast({
           title: "Acceso concedido",
-          description: "Bienvenido al sistema",
+          description: clientConfig.mensajeBienvenida,
         });
         navigate('/');
       } else {
@@ -68,13 +69,23 @@ const Login = () => {
       <Card className="w-full max-w-md">
         <CardHeader className="space-y-1 text-center">
           <div className="flex justify-center mb-4">
-            <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
-              <Lock className="h-8 w-8 text-primary" />
-            </div>
+            {clientConfig.logoUrl ? (
+              <img 
+                src={clientConfig.logoUrl} 
+                alt={clientConfig.nombre}
+                className="h-20 w-20 object-contain"
+              />
+            ) : (
+              <div className="h-16 w-16 rounded-full bg-primary/10 flex items-center justify-center">
+                <Building2 className="h-8 w-8 text-primary" />
+              </div>
+            )}
           </div>
-          <CardTitle className="text-2xl font-bold">Sistema de Gestión de RRHH</CardTitle>
+          <CardTitle className="text-2xl font-bold">
+            {clientConfig.nombre}
+          </CardTitle>
           <CardDescription>
-            Ingrese la contraseña para acceder al sistema
+            Sistema de Gestión de RRHH
           </CardDescription>
         </CardHeader>
         <CardContent>

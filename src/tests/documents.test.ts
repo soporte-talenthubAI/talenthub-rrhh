@@ -171,7 +171,7 @@ describe('Documents System Tests', () => {
         tempDiv.innerHTML = `
           <div style="padding: 48px; background: white; color: black;">
             <h1>REGLAMENTO INTERNO</h1>
-            <h2>AVÍCOLA LA PALOMA</h2>
+            <h2>MI EMPRESA</h2>
             <p><strong>Fecha:</strong> 01/01/2024</p>
             <p><strong>Nombre del empleado:</strong> Juan Pérez</p>
             <p>Este reglamento tiene por objetivo establecer normas claras...</p>

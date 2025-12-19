@@ -1,5 +1,6 @@
 import { format } from 'date-fns';
 import { es } from 'date-fns/locale';
+import { clientConfig } from '@/config/client';
 
 interface ApercibimientoTemplateProps {
   employeeData: {
@@ -26,7 +27,7 @@ export const ApercibimientoTemplate = ({ employeeData, generatedDate }: Apercibi
     }}>
       <div style={{ textAlign: 'center', marginBottom: '30px' }}>
         <h2 style={{ margin: '0 0 4px 0', fontSize: '16px', fontWeight: 'bold' }}>
-          AVICOLA LA PALOMA
+          {clientConfig.nombre.toUpperCase()}
         </h2>
       </div>
 
@@ -67,7 +68,7 @@ export const ApercibimientoTemplate = ({ employeeData, generatedDate }: Apercibi
       </p>
 
       <p style={{ marginBottom: '60px', textAlign: 'center', fontWeight: 'bold' }}>
-        AVICOLA LA PALOMA
+        {clientConfig.nombre.toUpperCase()}
       </p>
 
       <div style={{ marginTop: '80px' }}>

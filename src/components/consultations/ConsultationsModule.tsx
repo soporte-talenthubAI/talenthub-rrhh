@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Plus, Edit, Trash2, Users, Eye } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface VisitaConsultor {
   id: string;
@@ -287,7 +288,7 @@ const ConsultationsModule = () => {
                 {visits.map((visit) => (
                   <TableRow key={visit.id}>
                     <TableCell>
-                      {new Date(visit.fecha_consulta).toLocaleDateString('es-AR')}
+                      {formatDateLocal(visit.fecha_consulta)}
                     </TableCell>
                     <TableCell>
                       {visit.consultor || "No especificado"}
@@ -346,7 +347,7 @@ const ConsultationsModule = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Fecha de Consulta</Label>
-                  <p className="text-sm">{new Date(selectedVisit.fecha_consulta).toLocaleDateString('es-AR')}</p>
+                  <p className="text-sm">{formatDateLocal(selectedVisit.fecha_consulta)}</p>
                 </div>
                 <div>
                   <Label className="text-sm font-medium text-muted-foreground">Consultor</Label>
@@ -372,7 +373,7 @@ const ConsultationsModule = () => {
               
               <div>
                 <Label className="text-sm font-medium text-muted-foreground">Fecha de Registro</Label>
-                <p className="text-sm">{new Date(selectedVisit.created_at).toLocaleDateString('es-AR')} a las {new Date(selectedVisit.created_at).toLocaleTimeString('es-AR')}</p>
+                <p className="text-sm">{formatDateLocal(selectedVisit.created_at)} a las {new Date(selectedVisit.created_at).toLocaleTimeString('es-AR')}</p>
               </div>
             </div>
           )}

@@ -19,6 +19,7 @@ import { useTraining } from "@/hooks/useTraining";
 import { useAbsences } from "@/hooks/useAbsences";
 import { useSanctionStats } from "@/hooks/useSanctionStats";
 import { formatDateLocal } from "@/utils/dateUtils";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const DashboardOverview = () => {
   const { employees, getActiveEmployees } = useEmployees();
@@ -111,7 +112,7 @@ const DashboardOverview = () => {
     ...(absences || []).slice(0, 2).map(absence => ({
       id: `absence-${absence.id}`,
       message: `${absence.empleadoNombre} solicitó ausencia por ${absence.tipo}`,
-      time: new Date(absence.created_at).toLocaleDateString(),
+      time: formatDateLocal(absence.created_at),
       status: absence.estado === 'aprobado' ? 'success' : 'warning'
     })),
     ...(trainingStats?.completedTrainings || 0) > 0 ? [{

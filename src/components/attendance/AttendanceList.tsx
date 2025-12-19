@@ -11,6 +11,7 @@ import AttendanceReports from "./AttendanceReports";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useAttendanceData } from "@/hooks/useAttendanceData";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const AttendanceList = () => {
   const { toast } = useToast();
@@ -231,7 +232,7 @@ const AttendanceList = () => {
                   <div className="grid grid-cols-2 gap-4">
                     <div>
                       <p className="text-sm font-medium text-foreground/70">Fecha</p>
-                      <p className="text-foreground">{new Date(record.fecha).toLocaleDateString()}</p>
+                      <p className="text-foreground">{formatDateLocal(record.fecha)}</p>
                     </div>
                     <div>
                       <p className="text-sm font-medium text-foreground/70">DNI</p>
@@ -281,7 +282,7 @@ const AttendanceList = () => {
                         <AlertDialogHeader>
                           <AlertDialogTitle>¿Confirmar eliminación?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Esta acción no se puede deshacer. Se eliminará permanentemente el registro de asistencia de {record.empleadoNombre} del {new Date(record.fecha).toLocaleDateString()}.
+                            Esta acción no se puede deshacer. Se eliminará permanentemente el registro de asistencia de {record.empleadoNombre} del {formatDateLocal(record.fecha)}.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>

@@ -10,6 +10,8 @@ import { GraduationCap, Save, ArrowLeft, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useTrainings } from "@/hooks/useTrainings";
 import html2pdf from "html2pdf.js";
+import { clientConfig } from "@/config/client";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface TrainingFormProps {
   onBack: () => void;
@@ -99,7 +101,7 @@ const TrainingForm = ({ onBack, training, employees }: TrainingFormProps) => {
         ? `${employees.find(e => e.id.toString() === formData.empleadoId)?.nombres} ${employees.find(e => e.id.toString() === formData.empleadoId)?.apellidos}` 
         : "Empleado";
       const titulo = formData.titulo;
-      const fecha = new Date(formData.fecha).toLocaleDateString();
+      const fecha = formatDateLocal(formData.fecha);
       const horas = formData.duracion || "";
       const instructor = formData.instructor || "";
       const filename = `Certificado_${empleadoNombre.replace(/\s+/g, '_')}_${titulo.replace(/\s+/g, '_')}.pdf`;
@@ -108,7 +110,7 @@ const TrainingForm = ({ onBack, training, employees }: TrainingFormProps) => {
         <div style="font-family: Arial, sans-serif; padding: 32px; color: #111827; background: #ffffff;">
           <div style="text-align:center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 24px;">
             <h1 style=\"margin: 0; font-size: 22px;\">CERTIFICADO DE CAPACITACIÓN</h1>
-            <p style=\"margin: 6px 0 0 0; color: #6b7280;\">Avícola La Paloma</p>
+            <p style=\"margin: 6px 0 0 0; color: #6b7280;\">${clientConfig.nombre}</p>
           </div>
 
           <p style="font-size: 14px; line-height: 1.6;">
@@ -130,7 +132,7 @@ const TrainingForm = ({ onBack, training, employees }: TrainingFormProps) => {
           </div>
 
           <div style="text-align:center; font-size: 11px; color:#6b7280; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px;">
-            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH Avícola La Paloma
+            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH ${clientConfig.nombre}
           </div>
         </div>
       `;

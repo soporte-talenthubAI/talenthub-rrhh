@@ -4,6 +4,8 @@ import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, Award } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2pdf from "html2pdf.js";
+import { clientConfig } from "@/config/client";
+import { formatDateLocal, getCurrentDateString } from "@/utils/dateUtils";
 
 interface TrainingDetailProps {
   training: any;
@@ -17,7 +19,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
     try {
       const empleado = training.empleadoNombre || "Empleado";
       const titulo = training.titulo || "Capacitación";
-      const fecha = training.fecha ? new Date(training.fecha).toLocaleDateString() : new Date().toLocaleDateString();
+      const fecha = training.fecha ? formatDateLocal(training.fecha) : formatDateLocal(getCurrentDateString());
       const horas = training.duracion || 0;
       const instructor = training.instructor || "Instructor";
       const filename = `Certificado_${empleado.replace(/\s+/g, '_')}_${titulo.replace(/\s+/g, '_')}.pdf`;
@@ -26,7 +28,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
         <div style="font-family: Arial, sans-serif; padding: 32px; color: #111827; background: #ffffff;">
           <div style="text-align:center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 24px;">
             <h1 style="margin: 0; font-size: 22px;">CERTIFICADO OFICIAL DE CAPACITACIÓN</h1>
-            <p style="margin: 6px 0 0 0; color: #6b7280;">Avícola La Paloma</p>
+            <p style="margin: 6px 0 0 0; color: #6b7280;">${clientConfig.nombre}</p>
           </div>
 
           <p style="font-size: 14px; line-height: 1.6;">
@@ -53,7 +55,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
           </div>
 
           <div style="text-align:center; font-size: 11px; color:#6b7280; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px;">
-            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH Avícola La Paloma
+            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH ${clientConfig.nombre}
           </div>
         </div>
       `;
@@ -100,7 +102,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
     try {
       const empleado = training.empleadoNombre || "Empleado";
       const titulo = training.titulo || "Capacitación";
-      const fecha = training.fecha ? new Date(training.fecha).toLocaleDateString() : new Date().toLocaleDateString();
+      const fecha = training.fecha ? formatDateLocal(training.fecha) : formatDateLocal(getCurrentDateString());
       const horas = training.duracion || 0;
       const filename = `Constancia_Asistencia_${empleado.replace(/\s+/g, '_')}_${titulo.replace(/\s+/g, '_')}.pdf`;
 
@@ -108,7 +110,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
         <div style="font-family: Arial, sans-serif; padding: 32px; color: #111827; background: #ffffff;">
           <div style="text-align:center; border-bottom: 2px solid #e5e7eb; padding-bottom: 12px; margin-bottom: 24px;">
             <h1 style="margin: 0; font-size: 22px;">CONSTANCIA DE ASISTENCIA</h1>
-            <p style="margin: 6px 0 0 0; color: #6b7280;">Avícola La Paloma</p>
+            <p style="margin: 6px 0 0 0; color: #6b7280;">${clientConfig.nombre}</p>
           </div>
 
           <p style="font-size: 14px; line-height: 1.6;">
@@ -131,7 +133,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
           </div>
 
           <div style="text-align:center; font-size: 11px; color:#6b7280; margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 12px;">
-            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH Avícola La Paloma
+            Generado el ${new Date().toLocaleDateString()} - Sistema RRHH ${clientConfig.nombre}
           </div>
         </div>
       `;
@@ -223,7 +225,7 @@ const TrainingDetail = ({ training, onBack }: TrainingDetailProps) => {
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha</p>
-              <p className="text-foreground">{new Date(training.fecha).toLocaleDateString()}</p>
+              <p className="text-foreground">{formatDateLocal(training.fecha)}</p>
             </div>
             
             <div>

@@ -1,4 +1,5 @@
 import React from "react";
+import { clientConfig } from "@/config/client";
 
 interface ConsentimientoDatosBiometricosProps {
   employeeName: string;
@@ -67,7 +68,7 @@ const ConsentimientoDatosBiometricos = React.forwardRef<
         }}>
           El/la trabajador/a declara haber sido informado/a de la existencia de
           cámaras de seguridad instaladas en las instalaciones de la empresa
-          Avícola La Paloma (en adelante "la Empresa"), cuya finalidad exclusiva
+          {clientConfig.nombre} (en adelante "la Empresa"), cuya finalidad exclusiva
           es la prevención de riesgos, seguridad de las personas, resguardo de
           bienes materiales y control del cumplimiento de normas laborales.
         </p>

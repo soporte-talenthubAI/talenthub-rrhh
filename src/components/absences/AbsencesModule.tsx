@@ -11,6 +11,7 @@ import AbsenceDetail from "./AbsenceDetail";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useAbsences } from "@/hooks/useAbsences";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const AbsencesModule = () => {
   // AbsencesModule rendering
@@ -353,10 +354,10 @@ const AbsencesModule = () => {
                       <td className="py-4 px-4">
                         <div className="text-sm">
                           <div className="text-foreground">
-                            {new Date(absence.fechaInicio).toLocaleDateString('es-AR')}
+                            {formatDateLocal(absence.fechaInicio)}
                           </div>
                           <div className="text-foreground/70">
-                            al {new Date(absence.fechaFin).toLocaleDateString('es-AR')}
+                            al {formatDateLocal(absence.fechaFin)}
                           </div>
                         </div>
                       </td>

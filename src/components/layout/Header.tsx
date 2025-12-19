@@ -1,19 +1,13 @@
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { 
-  Users, 
-  CalendarDays, 
-  GraduationCap, 
-  ClipboardList, 
-  BarChart3, 
-  Calendar,
   Bell,
   Settings,
-  User,
-  LogOut
+  LogOut,
+  Building2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
+import { clientConfig } from "@/config/client";
 
 const Header = () => {
   const navigate = useNavigate();
@@ -32,14 +26,24 @@ const Header = () => {
       <div className="container flex h-16 items-center justify-between px-6">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-3">
-            <img 
-              src="/lovable-uploads/bc1834d3-5cc1-4aa1-9acd-e40b9c20d1bf.png" 
-              alt="Avícola La Paloma" 
-              className="h-12 w-12 object-contain"
-            />
+            {clientConfig.logoUrl ? (
+              <img 
+                src={clientConfig.logoUrl} 
+                alt={clientConfig.nombre} 
+                className="h-12 w-12 object-contain"
+              />
+            ) : (
+              <div className="h-12 w-12 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Building2 className="h-6 w-6 text-primary" />
+              </div>
+            )}
             <div>
-              <h1 className="text-xl font-bold text-foreground tracking-tight">RRHH Avícola La Paloma & TalentHub</h1>
-              <p className="text-sm text-muted-foreground">Sistema de gestión de personal • Desarrollo propio Talenthub</p>
+              <h1 className="text-xl font-bold text-foreground tracking-tight">
+                RRHH {clientConfig.nombre}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                Sistema de gestión de personal • TalentHub
+              </p>
             </div>
           </div>
         </div>

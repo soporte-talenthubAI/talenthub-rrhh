@@ -1,4 +1,5 @@
 import React from "react";
+import { clientConfig } from "@/config/client";
 
 interface ReglamentoInternoProps {
   employeeName: string;
@@ -43,7 +44,7 @@ const ReglamentoInternoSimple = React.forwardRef<
           marginBottom: "30px",
           margin: "0 0 30px 0"
         }}>
-          AVÍCOLA LA PALOMA
+          {clientConfig.nombre.toUpperCase()}
         </h2>
 
         <p style={{ margin: "0 0 8px 0" }}>

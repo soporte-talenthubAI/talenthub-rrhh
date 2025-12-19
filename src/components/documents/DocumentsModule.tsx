@@ -17,6 +17,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useDocuments } from "@/hooks/useDocuments";
 import { generateAndUploadPDF, downloadPDFFromStorage, deletePDFFromStorage, signPDF } from "@/utils/pdfGenerator";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 const DocumentsModule = () => {
   const { toast } = useToast();
@@ -422,7 +423,7 @@ const DocumentsModule = () => {
                       <td className="py-4 px-4">
                         <span className="text-sm text-foreground">
                           {document.signed_date 
-                            ? new Date(document.signed_date).toLocaleDateString('es-AR')
+                            ? formatDateLocal(document.signed_date)
                             : '-'
                           }
                         </span>

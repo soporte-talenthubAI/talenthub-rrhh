@@ -5,6 +5,7 @@ import { ArrowLeft, Download, FileText, Calendar, User, Clock } from "lucide-rea
 import { useToast } from "@/hooks/use-toast";
 import { useAbsences } from "@/hooks/useAbsences";
 import AbsencePDF from "./AbsencePDF";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface AbsenceDetailProps {
   absence: any;
@@ -155,7 +156,7 @@ const AbsenceDetail = ({ absence, onBack }: AbsenceDetailProps) => {
                   <h4 className="font-semibold text-foreground mb-2">Fecha de Inicio</h4>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-foreground/60" />
-                    <span className="text-foreground">{new Date(absence.fechaInicio).toLocaleDateString()}</span>
+                    <span className="text-foreground">{formatDateLocal(absence.fechaInicio)}</span>
                   </div>
                 </div>
 
@@ -163,13 +164,13 @@ const AbsenceDetail = ({ absence, onBack }: AbsenceDetailProps) => {
                   <h4 className="font-semibold text-foreground mb-2">Fecha de Fin</h4>
                   <div className="flex items-center space-x-2">
                     <Calendar className="h-4 w-4 text-foreground/60" />
-                    <span className="text-foreground">{new Date(absence.fechaFin).toLocaleDateString()}</span>
+                    <span className="text-foreground">{formatDateLocal(absence.fechaFin)}</span>
                   </div>
                 </div>
 
                 <div>
                   <h4 className="font-semibold text-foreground mb-2">Fecha de Solicitud</h4>
-                  <p className="text-foreground/70">{new Date(absence.fechaSolicitud).toLocaleDateString()}</p>
+                  <p className="text-foreground/70">{formatDateLocal(absence.fechaSolicitud)}</p>
                 </div>
               </div>
             </div>

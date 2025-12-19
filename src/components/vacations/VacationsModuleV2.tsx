@@ -12,6 +12,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
+import { clientConfig } from "@/config/client";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 export const VacationsModule = () => {
   const { toast } = useToast();
@@ -136,8 +138,8 @@ export const VacationsModule = () => {
         ? `${vacation.employee.nombres} ${vacation.employee.apellidos}` 
         : "Empleado";
       const dni = vacation.employee?.dni || "";
-      const inicio = vacation.fecha_inicio ? new Date(vacation.fecha_inicio).toLocaleDateString("es-AR") : "";
-      const fin = vacation.fecha_fin ? new Date(vacation.fecha_fin).toLocaleDateString("es-AR") : "";
+      const inicio = vacation.fecha_inicio ? formatDateLocal(vacation.fecha_inicio) : "";
+      const fin = vacation.fecha_fin ? formatDateLocal(vacation.fecha_fin) : "";
       const emitido = new Date().toLocaleDateString("es-AR");
       const dias = vacation.dias_solicitados || 0;
       const periodo = vacation.periodo || new Date().getFullYear().toString();
@@ -157,7 +159,7 @@ export const VacationsModule = () => {
       
       container.innerHTML = `
         <div style="text-align:center; margin-bottom:12px;">
-          <h2 style="margin:0 0 4px 0; font-size:16px; font-weight:bold;">AVICOLA LA PALOMA</h2>
+          <h2 style="margin:0 0 4px 0; font-size:16px; font-weight:bold;">${clientConfig.nombre.toUpperCase()}</h2>
         </div>
         
         <h1 style="text-align:center; font-size:18px; font-weight:bold; margin:12px 0;">NOTIFICACIÓN DE VACACIONES</h1>
@@ -182,7 +184,7 @@ export const VacationsModule = () => {
         <p style="margin:12px 0;"><strong>Fecha:</strong> ${emitido}</p>
         
         <div style="text-align:center; margin:20px 0 12px 0;">
-          <p style="font-style:italic; margin-bottom:4px;">La Paloma</p>
+          <p style="font-style:italic; margin-bottom:4px;">${clientConfig.nombreCorto}</p>
         </div>
         
         <p style="margin:16px 0 8px 0;">Me notifico de la comunicación que antecede, tomando debida nota.</p>
@@ -285,7 +287,7 @@ export const VacationsModule = () => {
         <tr>
           <td style="padding:6px 8px; border:1px solid #ddd;">${v.employee ? `${v.employee.nombres} ${v.employee.apellidos}` : ''}</td>
           <td style="padding:6px 8px; border:1px solid #ddd;">${v.periodo}</td>
-          <td style="padding:6px 8px; border:1px solid #ddd;">${new Date(v.fecha_inicio).toLocaleDateString("es-AR")} - ${new Date(v.fecha_fin).toLocaleDateString("es-AR")}</td>
+          <td style="padding:6px 8px; border:1px solid #ddd;">${formatDateLocal(v.fecha_inicio)} - ${formatDateLocal(v.fecha_fin)}</td>
           <td style="padding:6px 8px; border:1px solid #ddd; text-align:center;">${v.dias_solicitados}</td>
           <td style="padding:6px 8px; border:1px solid #ddd; text-transform:capitalize;">${v.estado}</td>
         </tr>
@@ -568,7 +570,7 @@ export const VacationsModule = () => {
                           </div>
                           <div className="text-sm text-muted-foreground mt-1">
                             <span className="mr-4">
-                              📅 {new Date(vacation.fecha_inicio).toLocaleDateString("es-AR")} - {new Date(vacation.fecha_fin).toLocaleDateString("es-AR")}
+                              📅 {formatDateLocal(vacation.fecha_inicio)} - {formatDateLocal(vacation.fecha_fin)}
                             </span>
                             <span className="mr-4">📊 {vacation.dias_solicitados} días</span>
                             {vacation.motivo && <span>💼 {vacation.motivo}</span>}

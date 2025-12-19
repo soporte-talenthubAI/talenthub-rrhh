@@ -4,6 +4,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Download, FileText, User, Calendar, Clock, AlertTriangle } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { clientConfig } from "@/config/client";
+import { formatDateLocal } from "@/utils/dateUtils";
 
 interface AbsencePDFProps {
   absenceData: any;
@@ -48,7 +50,7 @@ const AbsencePDF = ({ absenceData, trigger }: AbsencePDFProps) => {
 
   const formatDate = (dateString: string) => {
     if (!dateString) return "No especificado";
-    return new Date(dateString).toLocaleDateString();
+    return formatDateLocal(dateString) || "No especificado";
   };
 
   const calculateDuration = () => {
@@ -98,7 +100,7 @@ const AbsencePDF = ({ absenceData, trigger }: AbsencePDFProps) => {
           {/* Header del Certificado */}
           <div className="text-center border-b-2 pb-4" style={{ borderColor: '#e5e7eb' }}>
             <h1 className="text-2xl font-bold mb-2" style={{ color: '#1f2937' }}>CERTIFICADO DE AUSENCIA</h1>
-            <h2 className="text-lg font-semibold" style={{ color: '#4b5563' }}>AVÍCOLA LA PALOMA</h2>
+            <h2 className="text-lg font-semibold" style={{ color: '#4b5563' }}>{clientConfig.nombre.toUpperCase()}</h2>
             <p className="text-sm mt-2" style={{ color: '#6b7280' }}>
               Fecha de Generación: {new Date().toLocaleDateString()}
             </p>
@@ -266,7 +268,7 @@ const AbsencePDF = ({ absenceData, trigger }: AbsencePDFProps) => {
               Este documento constituye el certificado oficial de ausencia según normativas laborales vigentes.
             </p>
             <p className="mt-1">
-              Generado el {new Date().toLocaleDateString()} - Sistema RRHH Avícola La Paloma
+              Generado el {new Date().toLocaleDateString()} - Sistema RRHH {clientConfig.nombre}
             </p>
           </div>
         </div>
