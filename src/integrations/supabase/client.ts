@@ -9,14 +9,17 @@
 import { createClient } from '@supabase/supabase-js';
 import type { Database } from './types';
 
-// Valores por defecto (desarrollo local - SIEMPRE usar variables de entorno en producción)
-// PROYECTO: lmxyphwydubacsekkyxi (TalentHub Master)
-const DEFAULT_SUPABASE_URL = "https://lmxyphwydubacsekkyxi.supabase.co";
-const DEFAULT_SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxteHlwaHd5ZHViYWNzZWtreXhpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjYxMzMyNDcsImV4cCI6MjA4MTcwOTI0N30.tIATNnKhUxH-L655Nr6CpuV7XfSDSUphbmQCPbfsh-8";
+// Variables de entorno (OBLIGATORIAS)
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL;
+const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 
-// Usar variables de entorno si están disponibles, sino usar defaults
-const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL || DEFAULT_SUPABASE_URL;
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_KEY;
+// Validar que las variables existan
+if (!SUPABASE_URL || !SUPABASE_ANON_KEY) {
+  throw new Error(
+    '❌ Faltan variables de entorno de Supabase.\n' +
+    'Configura VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY en tu archivo .env o en Vercel.'
+  );
+}
 
 // Log para debug (solo en desarrollo)
 if (import.meta.env.DEV) {
