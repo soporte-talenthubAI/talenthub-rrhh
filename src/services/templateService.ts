@@ -378,10 +378,10 @@ export async function uploadTemplatePDF(
     const sanitizedName = templateName.toLowerCase().replace(/[^a-z0-9]/g, '_');
     const filename = `${sanitizedName}_${timestamp}.pdf`;
 
-    // Subir archivo
+    // Subir archivo al bucket 'documents' en carpeta 'templates'
     const { error: uploadError } = await supabase.storage
-      .from('document-templates')
-      .upload(filename, file, {
+      .from('documents')
+      .upload(`templates/${filename}`, file, {
         cacheControl: '3600',
         upsert: true,
         contentType: 'application/pdf',
@@ -394,8 +394,8 @@ export async function uploadTemplatePDF(
 
     // Obtener URL pública
     const { data: urlData } = supabase.storage
-      .from('document-templates')
-      .getPublicUrl(filename);
+      .from('documents')
+      .getPublicUrl(`templates/${filename}`);
 
     return {
       url: urlData.publicUrl,
@@ -417,8 +417,8 @@ export async function deleteTemplatePDF(pdfUrl: string): Promise<boolean> {
     const filename = urlParts[urlParts.length - 1];
 
     const { error } = await supabase.storage
-      .from('document-templates')
-      .remove([filename]);
+      .from('documents')
+      .remove([`templates/${filename}`]);
 
     if (error) {
       console.error('Error deleting PDF:', error);
