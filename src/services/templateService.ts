@@ -26,7 +26,28 @@ export interface DocumentTemplate {
   requiere_firma_empresa: boolean;
   is_active: boolean;
   is_default: boolean;
+  // Nuevos campos para PDF templates
+  module_id: string | null;
+  pdf_url: string | null;
+  pdf_filename: string | null;
+  pdf_fields: string[] | null;
+  descripcion: string | null;
+  instrucciones: string | null;
 }
+
+// Lista de módulos disponibles
+export const AVAILABLE_MODULES = [
+  { id: 'employees', nombre: 'Empleados', icon: 'Users' },
+  { id: 'vacations', nombre: 'Vacaciones', icon: 'Calendar' },
+  { id: 'absences', nombre: 'Ausencias', icon: 'CalendarOff' },
+  { id: 'sanctions', nombre: 'Sanciones', icon: 'AlertTriangle' },
+  { id: 'documents', nombre: 'Documentos', icon: 'FileText' },
+  { id: 'payroll', nombre: 'Nómina', icon: 'DollarSign' },
+  { id: 'training', nombre: 'Capacitaciones', icon: 'GraduationCap' },
+  { id: 'uniforms', nombre: 'Uniformes', icon: 'Shirt' },
+  { id: 'performance', nombre: 'Desempeño', icon: 'TrendingUp' },
+  { id: 'declarations', nombre: 'Declaraciones', icon: 'ClipboardList' },
+];
 
 export interface TemplateType {
   id: string;
@@ -321,6 +342,130 @@ export async function checkTemplatesTableExists(): Promise<boolean> {
     return !error;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Obtiene templates por módulo
+ */
+export async function getTemplatesByModule(moduleId: string): Promise<DocumentTemplate[]> {
+  const { data, error } = await supabase
+    .from("document_templates")
+    .select("*")
+    .eq("module_id", moduleId)
+    .eq("is_active", true)
+    .order("is_default", { ascending: false })
+    .order("nombre");
+
+  if (error) {
+    console.error("Error fetching templates by module:", error);
+    return [];
+  }
+
+  return data || [];
+}
+
+/**
+ * Sube un archivo PDF al storage y retorna la URL
+ */
+export async function uploadTemplatePDF(
+  file: File,
+  templateName: string
+): Promise<{ url: string; filename: string } | null> {
+  try {
+    // Generar nombre único para el archivo
+    const timestamp = Date.now();
+    const sanitizedName = templateName.toLowerCase().replace(/[^a-z0-9]/g, '_');
+    const filename = `${sanitizedName}_${timestamp}.pdf`;
+
+    // Subir archivo
+    const { error: uploadError } = await supabase.storage
+      .from('document-templates')
+      .upload(filename, file, {
+        cacheControl: '3600',
+        upsert: true,
+        contentType: 'application/pdf',
+      });
+
+    if (uploadError) {
+      console.error('Error uploading PDF:', uploadError);
+      return null;
+    }
+
+    // Obtener URL pública
+    const { data: urlData } = supabase.storage
+      .from('document-templates')
+      .getPublicUrl(filename);
+
+    return {
+      url: urlData.publicUrl,
+      filename: file.name,
+    };
+  } catch (error) {
+    console.error('Error in uploadTemplatePDF:', error);
+    return null;
+  }
+}
+
+/**
+ * Elimina un PDF del storage
+ */
+export async function deleteTemplatePDF(pdfUrl: string): Promise<boolean> {
+  try {
+    // Extraer el nombre del archivo de la URL
+    const urlParts = pdfUrl.split('/');
+    const filename = urlParts[urlParts.length - 1];
+
+    const { error } = await supabase.storage
+      .from('document-templates')
+      .remove([filename]);
+
+    if (error) {
+      console.error('Error deleting PDF:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in deleteTemplatePDF:', error);
+    return false;
+  }
+}
+
+/**
+ * Guarda un template con PDF
+ */
+export async function saveTemplateWithPDF(
+  template: Partial<DocumentTemplate> & { template_type_id: string; nombre: string },
+  pdfFile?: File
+): Promise<DocumentTemplate | null> {
+  try {
+    let pdfData: { url: string; filename: string } | null = null;
+
+    // Si hay un archivo PDF, subirlo primero
+    if (pdfFile) {
+      pdfData = await uploadTemplatePDF(pdfFile, template.nombre);
+      if (!pdfData) {
+        console.error('Failed to upload PDF');
+        return null;
+      }
+    }
+
+    // Preparar datos del template
+    const templateData: any = {
+      ...template,
+    };
+
+    if (pdfData) {
+      templateData.pdf_url = pdfData.url;
+      templateData.pdf_filename = pdfData.filename;
+    }
+
+    // Guardar en la base de datos
+    return await saveTemplate(templateData);
+  } catch (error) {
+    console.error('Error in saveTemplateWithPDF:', error);
+    return null;
   }
 }
 

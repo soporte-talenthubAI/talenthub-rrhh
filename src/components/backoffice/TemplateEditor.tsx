@@ -23,7 +23,8 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { 
   FileText, Code, Eye, Save, Plus, Copy, 
-  ChevronLeft, AlertCircle, CheckCircle, Trash2
+  ChevronLeft, AlertCircle, CheckCircle, Trash2,
+  Upload, File, Download, FolderOpen
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { supabase } from "@/integrations/supabase/client";
@@ -33,8 +34,10 @@ import {
   saveTemplate, 
   deleteTemplate,
   replacePlaceholders,
+  saveTemplateWithPDF,
   DocumentTemplate,
-  TemplateType
+  TemplateType,
+  AVAILABLE_MODULES
 } from "@/services/templateService";
 
 // Datos de ejemplo para preview
@@ -122,7 +125,11 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
   const [newTemplate, setNewTemplate] = useState({
     nombre: "",
     template_type_id: "",
+    module_id: "",
+    descripcion: "",
   });
+  const [pdfFile, setPdfFile] = useState<File | null>(null);
+  const [filterModule, setFilterModule] = useState<string>("all");
 
   // Cargar datos iniciales
   useEffect(() => {
@@ -206,10 +213,10 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
 
   // Crear nuevo template
   const handleCreateTemplate = async () => {
-    if (!newTemplate.nombre || !newTemplate.template_type_id) {
+    if (!newTemplate.nombre || !newTemplate.template_type_id || !newTemplate.module_id) {
       toast({
         title: "Campos requeridos",
-        description: "Complete todos los campos",
+        description: "Complete nombre, tipo y módulo",
         variant: "destructive",
       });
       return;
@@ -217,7 +224,7 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
     
     setSaving(true);
     try {
-      const defaultHtml = `<!DOCTYPE html>
+      const defaultHtml = pdfFile ? null : `<!DOCTYPE html>
 <html>
 <head>
   <style>
@@ -249,23 +256,28 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
 </body>
 </html>`;
 
-      const result = await saveTemplate({
+      const result = await saveTemplateWithPDF({
         template_type_id: newTemplate.template_type_id,
         nombre: newTemplate.nombre,
+        module_id: newTemplate.module_id,
+        descripcion: newTemplate.descripcion,
         contenido_html: defaultHtml,
         is_active: true,
         is_default: false,
-      });
+      }, pdfFile || undefined);
       
       if (result) {
         toast({
           title: "Template creado",
-          description: "El nuevo template se creó correctamente",
+          description: pdfFile 
+            ? "Template PDF subido correctamente" 
+            : "Template HTML creado correctamente",
         });
         
         setTemplates(prev => [...prev, result]);
         setShowNewDialog(false);
-        setNewTemplate({ nombre: "", template_type_id: "" });
+        setNewTemplate({ nombre: "", template_type_id: "", module_id: "", descripcion: "" });
+        setPdfFile(null);
         handleSelectTemplate(result);
       }
     } catch (error) {
@@ -278,6 +290,35 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
       setSaving(false);
     }
   };
+
+  // Manejar selección de archivo PDF
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      if (file.type !== 'application/pdf') {
+        toast({
+          title: "Archivo inválido",
+          description: "Solo se permiten archivos PDF",
+          variant: "destructive",
+        });
+        return;
+      }
+      if (file.size > 10 * 1024 * 1024) { // 10MB
+        toast({
+          title: "Archivo muy grande",
+          description: "El archivo no puede superar 10MB",
+          variant: "destructive",
+        });
+        return;
+      }
+      setPdfFile(file);
+    }
+  };
+
+  // Filtrar templates por módulo
+  const filteredTemplates = filterModule === "all" 
+    ? templates 
+    : templates.filter(t => t.module_id === filterModule);
 
   // Copiar placeholder al portapapeles
   const copyPlaceholder = (placeholder: string) => {
@@ -346,47 +387,125 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
               Nuevo Template
             </Button>
           </DialogTrigger>
-          <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogContent className="bg-slate-800 border-slate-700 max-w-lg">
             <DialogHeader>
               <DialogTitle className="text-white">Nuevo Template</DialogTitle>
               <DialogDescription className="text-slate-400">
-                Crea un nuevo template de documento
+                Sube un PDF o crea un template HTML
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-4 pt-4">
               <div className="space-y-2">
-                <Label className="text-slate-300">Nombre del Template</Label>
+                <Label className="text-slate-300">Nombre del Template *</Label>
                 <Input
                   value={newTemplate.nombre}
                   onChange={(e) => setNewTemplate(prev => ({ ...prev, nombre: e.target.value }))}
-                  placeholder="Ej: Constancia de Trabajo Personalizada"
+                  placeholder="Ej: Constancia de Trabajo"
                   className="bg-slate-700 border-slate-600 text-white"
                 />
               </div>
-              <div className="space-y-2">
-                <Label className="text-slate-300">Tipo de Documento</Label>
-                <Select
-                  value={newTemplate.template_type_id}
-                  onValueChange={(v) => setNewTemplate(prev => ({ ...prev, template_type_id: v }))}
-                >
-                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                    <SelectValue placeholder="Seleccione tipo..." />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {templateTypes.map(type => (
-                      <SelectItem key={type.id} value={type.id}>
-                        {type.nombre}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+              
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label className="text-slate-300">Módulo *</Label>
+                  <Select
+                    value={newTemplate.module_id}
+                    onValueChange={(v) => setNewTemplate(prev => ({ ...prev, module_id: v }))}
+                  >
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Seleccione módulo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {AVAILABLE_MODULES.map(mod => (
+                        <SelectItem key={mod.id} value={mod.id}>
+                          {mod.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div className="space-y-2">
+                  <Label className="text-slate-300">Tipo de Documento *</Label>
+                  <Select
+                    value={newTemplate.template_type_id}
+                    onValueChange={(v) => setNewTemplate(prev => ({ ...prev, template_type_id: v }))}
+                  >
+                    <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                      <SelectValue placeholder="Seleccione tipo..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {templateTypes.map(type => (
+                        <SelectItem key={type.id} value={type.id}>
+                          {type.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
+              
+              <div className="space-y-2">
+                <Label className="text-slate-300">Descripción</Label>
+                <Input
+                  value={newTemplate.descripcion}
+                  onChange={(e) => setNewTemplate(prev => ({ ...prev, descripcion: e.target.value }))}
+                  placeholder="Descripción breve del template"
+                  className="bg-slate-700 border-slate-600 text-white"
+                />
+              </div>
+              
+              {/* Upload PDF */}
+              <div className="space-y-2">
+                <Label className="text-slate-300">Archivo PDF (opcional)</Label>
+                <div className="border-2 border-dashed border-slate-600 rounded-lg p-4 text-center hover:border-emerald-500 transition-colors">
+                  {pdfFile ? (
+                    <div className="flex items-center justify-center gap-3">
+                      <File className="h-8 w-8 text-emerald-400" />
+                      <div className="text-left">
+                        <p className="text-white text-sm font-medium">{pdfFile.name}</p>
+                        <p className="text-slate-400 text-xs">
+                          {(pdfFile.size / 1024 / 1024).toFixed(2)} MB
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setPdfFile(null)}
+                        className="text-red-400 hover:text-red-300"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <label className="cursor-pointer block">
+                      <Upload className="h-8 w-8 text-slate-400 mx-auto mb-2" />
+                      <p className="text-slate-300 text-sm">
+                        Click para subir PDF
+                      </p>
+                      <p className="text-slate-500 text-xs mt-1">
+                        Máximo 10MB
+                      </p>
+                      <input
+                        type="file"
+                        accept=".pdf,application/pdf"
+                        onChange={handleFileSelect}
+                        className="hidden"
+                      />
+                    </label>
+                  )}
+                </div>
+                <p className="text-xs text-slate-500">
+                  Si no subes un PDF, se creará un template HTML editable
+                </p>
+              </div>
+              
               <Button 
                 onClick={handleCreateTemplate} 
                 className="w-full bg-emerald-600 hover:bg-emerald-700"
                 disabled={saving}
               >
-                {saving ? "Creando..." : "Crear Template"}
+                {saving ? "Creando..." : pdfFile ? "Subir Template PDF" : "Crear Template HTML"}
               </Button>
             </div>
           </DialogContent>
@@ -398,12 +517,33 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
         <div className="col-span-3">
           <Card className="bg-slate-800 border-slate-700">
             <CardHeader className="pb-3">
-              <CardTitle className="text-white text-sm">Templates Disponibles</CardTitle>
+              <CardTitle className="text-white text-sm flex items-center justify-between">
+                <span>Templates</span>
+                <Badge variant="secondary" className="text-xs">
+                  {filteredTemplates.length}
+                </Badge>
+              </CardTitle>
+              {/* Filtro por módulo */}
+              <Select value={filterModule} onValueChange={setFilterModule}>
+                <SelectTrigger className="bg-slate-700 border-slate-600 text-white text-xs h-8">
+                  <FolderOpen className="h-3 w-3 mr-1" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos los módulos</SelectItem>
+                  <Separator className="my-1" />
+                  {AVAILABLE_MODULES.map(mod => (
+                    <SelectItem key={mod.id} value={mod.id}>
+                      {mod.nombre}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </CardHeader>
             <CardContent className="p-0">
-              <ScrollArea className="h-[500px]">
+              <ScrollArea className="h-[450px]">
                 <div className="space-y-1 p-3">
-                  {templates.map((template) => (
+                  {filteredTemplates.map((template) => (
                     <button
                       key={template.id}
                       onClick={() => handleSelectTemplate(template)}
@@ -413,23 +553,39 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
                           : "bg-slate-700/50 hover:bg-slate-700 border border-transparent"
                       }`}
                     >
-                      <p className="font-medium text-white text-sm truncate">
-                        {template.nombre}
-                      </p>
+                      <div className="flex items-start justify-between">
+                        <p className="font-medium text-white text-sm truncate flex-1">
+                          {template.nombre}
+                        </p>
+                        {template.pdf_url && (
+                          <Badge variant="outline" className="text-xs border-red-500 text-red-400 ml-2">
+                            PDF
+                          </Badge>
+                        )}
+                      </div>
                       <p className="text-xs text-slate-400 mt-1">
                         {template.template_type_id}
                       </p>
-                      {template.is_default && (
-                        <Badge variant="secondary" className="mt-2 text-xs">
-                          Default
-                        </Badge>
-                      )}
+                      <div className="flex gap-1 mt-2">
+                        {template.module_id && (
+                          <Badge variant="secondary" className="text-xs">
+                            {AVAILABLE_MODULES.find(m => m.id === template.module_id)?.nombre || template.module_id}
+                          </Badge>
+                        )}
+                        {template.is_default && (
+                          <Badge className="text-xs bg-emerald-600">
+                            Default
+                          </Badge>
+                        )}
+                      </div>
                     </button>
                   ))}
                   
-                  {templates.length === 0 && (
+                  {filteredTemplates.length === 0 && (
                     <p className="text-center text-slate-400 py-8 text-sm">
-                      No hay templates. Ejecute la migración primero.
+                      {filterModule === "all" 
+                        ? "No hay templates. Crea uno nuevo."
+                        : "No hay templates para este módulo."}
                     </p>
                   )}
                 </div>
@@ -445,12 +601,35 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
                   <div>
-                    <CardTitle className="text-white">{selectedTemplate.nombre}</CardTitle>
+                    <CardTitle className="text-white flex items-center gap-2">
+                      {selectedTemplate.nombre}
+                      {selectedTemplate.pdf_url && (
+                        <Badge variant="outline" className="text-xs border-red-500 text-red-400">
+                          PDF
+                        </Badge>
+                      )}
+                    </CardTitle>
                     <CardDescription className="text-slate-400">
                       Tipo: {selectedTemplate.template_type_id}
+                      {selectedTemplate.module_id && (
+                        <span className="ml-2">
+                          | Módulo: {AVAILABLE_MODULES.find(m => m.id === selectedTemplate.module_id)?.nombre}
+                        </span>
+                      )}
                     </CardDescription>
                   </div>
                   <div className="flex items-center gap-2">
+                    {selectedTemplate.pdf_url && (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open(selectedTemplate.pdf_url!, '_blank')}
+                        className="border-slate-600 text-slate-300"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Descargar PDF
+                      </Button>
+                    )}
                     <Button
                       variant="ghost"
                       size="sm"
@@ -459,91 +638,141 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
                     >
                       <Trash2 className="h-4 w-4" />
                     </Button>
-                    <Button
-                      onClick={handleSave}
-                      disabled={saving}
-                      className="bg-emerald-600 hover:bg-emerald-700"
-                    >
-                      <Save className="h-4 w-4 mr-2" />
-                      {saving ? "Guardando..." : "Guardar"}
-                    </Button>
+                    {!selectedTemplate.pdf_url && (
+                      <Button
+                        onClick={handleSave}
+                        disabled={saving}
+                        className="bg-emerald-600 hover:bg-emerald-700"
+                      >
+                        <Save className="h-4 w-4 mr-2" />
+                        {saving ? "Guardando..." : "Guardar"}
+                      </Button>
+                    )}
                   </div>
                 </div>
               </CardHeader>
               <CardContent>
-                <Tabs defaultValue="editor" className="space-y-4">
-                  <TabsList className="bg-slate-700">
-                    <TabsTrigger value="editor" className="data-[state=active]:bg-emerald-600">
-                      <Code className="h-4 w-4 mr-2" />
-                      Editor HTML
-                    </TabsTrigger>
-                    <TabsTrigger value="preview" className="data-[state=active]:bg-emerald-600">
-                      <Eye className="h-4 w-4 mr-2" />
-                      Preview
-                    </TabsTrigger>
-                    <TabsTrigger value="placeholders" className="data-[state=active]:bg-emerald-600">
-                      <FileText className="h-4 w-4 mr-2" />
-                      Variables
-                    </TabsTrigger>
-                  </TabsList>
-
-                  <TabsContent value="editor">
-                    <Textarea
-                      value={editedContent}
-                      onChange={(e) => {
-                        setEditedContent(e.target.value);
-                        updatePreview(e.target.value);
-                      }}
-                      className="font-mono text-sm bg-slate-900 border-slate-600 text-slate-200 min-h-[400px]"
-                      placeholder="Escriba el HTML del template aquí..."
-                    />
-                  </TabsContent>
-
-                  <TabsContent value="preview">
-                    <div className="bg-white rounded-lg p-4 min-h-[400px]">
+                {/* Si es PDF, mostrar visor de PDF */}
+                {selectedTemplate.pdf_url ? (
+                  <div className="space-y-4">
+                    <div className="bg-slate-900 rounded-lg p-4 text-center">
+                      <File className="h-16 w-16 text-red-400 mx-auto mb-4" />
+                      <p className="text-white font-medium mb-2">
+                        {selectedTemplate.pdf_filename || 'Template PDF'}
+                      </p>
+                      <p className="text-slate-400 text-sm mb-4">
+                        Este template es un archivo PDF. Los campos se llenarán automáticamente
+                        con la información del empleado al generar el documento.
+                      </p>
+                      <div className="flex justify-center gap-3">
+                        <Button
+                          onClick={() => window.open(selectedTemplate.pdf_url!, '_blank')}
+                          className="bg-emerald-600 hover:bg-emerald-700"
+                        >
+                          <Eye className="h-4 w-4 mr-2" />
+                          Ver PDF
+                        </Button>
+                        <Button
+                          variant="outline"
+                          onClick={() => {
+                            const a = document.createElement('a');
+                            a.href = selectedTemplate.pdf_url!;
+                            a.download = selectedTemplate.pdf_filename || 'template.pdf';
+                            a.click();
+                          }}
+                          className="border-slate-600 text-slate-300"
+                        >
+                          <Download className="h-4 w-4 mr-2" />
+                          Descargar
+                        </Button>
+                      </div>
+                    </div>
+                    
+                    {/* Iframe para preview del PDF */}
+                    <div className="bg-white rounded-lg overflow-hidden">
                       <iframe
-                        srcDoc={previewHtml}
-                        className="w-full h-[400px] border-0"
-                        title="Template Preview"
+                        src={selectedTemplate.pdf_url}
+                        className="w-full h-[500px] border-0"
+                        title="PDF Preview"
                       />
                     </div>
-                  </TabsContent>
+                  </div>
+                ) : (
+                  /* Si es HTML, mostrar editor */
+                  <Tabs defaultValue="editor" className="space-y-4">
+                    <TabsList className="bg-slate-700">
+                      <TabsTrigger value="editor" className="data-[state=active]:bg-emerald-600">
+                        <Code className="h-4 w-4 mr-2" />
+                        Editor HTML
+                      </TabsTrigger>
+                      <TabsTrigger value="preview" className="data-[state=active]:bg-emerald-600">
+                        <Eye className="h-4 w-4 mr-2" />
+                        Preview
+                      </TabsTrigger>
+                      <TabsTrigger value="placeholders" className="data-[state=active]:bg-emerald-600">
+                        <FileText className="h-4 w-4 mr-2" />
+                        Variables
+                      </TabsTrigger>
+                    </TabsList>
 
-                  <TabsContent value="placeholders">
-                    <div className="grid grid-cols-2 gap-4">
-                      {PLACEHOLDERS.map((group) => (
-                        <Card key={group.category} className="bg-slate-700/50 border-slate-600">
-                          <CardHeader className="py-3">
-                            <CardTitle className="text-white text-sm">{group.category}</CardTitle>
-                          </CardHeader>
-                          <CardContent className="py-2">
-                            <div className="space-y-2">
-                              {group.items.map((item) => (
-                                <div
-                                  key={item.key}
-                                  className="flex items-center justify-between p-2 bg-slate-800 rounded"
-                                >
-                                  <div>
-                                    <code className="text-emerald-400 text-xs">{item.key}</code>
-                                    <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
-                                  </div>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => copyPlaceholder(item.key)}
-                                    className="h-7 w-7 p-0"
+                    <TabsContent value="editor">
+                      <Textarea
+                        value={editedContent}
+                        onChange={(e) => {
+                          setEditedContent(e.target.value);
+                          updatePreview(e.target.value);
+                        }}
+                        className="font-mono text-sm bg-slate-900 border-slate-600 text-slate-200 min-h-[400px]"
+                        placeholder="Escriba el HTML del template aquí..."
+                      />
+                    </TabsContent>
+
+                    <TabsContent value="preview">
+                      <div className="bg-white rounded-lg p-4 min-h-[400px]">
+                        <iframe
+                          srcDoc={previewHtml}
+                          className="w-full h-[400px] border-0"
+                          title="Template Preview"
+                        />
+                      </div>
+                    </TabsContent>
+
+                    <TabsContent value="placeholders">
+                      <div className="grid grid-cols-2 gap-4">
+                        {PLACEHOLDERS.map((group) => (
+                          <Card key={group.category} className="bg-slate-700/50 border-slate-600">
+                            <CardHeader className="py-3">
+                              <CardTitle className="text-white text-sm">{group.category}</CardTitle>
+                            </CardHeader>
+                            <CardContent className="py-2">
+                              <div className="space-y-2">
+                                {group.items.map((item) => (
+                                  <div
+                                    key={item.key}
+                                    className="flex items-center justify-between p-2 bg-slate-800 rounded"
                                   >
-                                    <Copy className="h-3 w-3" />
-                                  </Button>
-                                </div>
-                              ))}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                  </TabsContent>
-                </Tabs>
+                                    <div>
+                                      <code className="text-emerald-400 text-xs">{item.key}</code>
+                                      <p className="text-xs text-slate-400 mt-0.5">{item.desc}</p>
+                                    </div>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => copyPlaceholder(item.key)}
+                                      className="h-7 w-7 p-0"
+                                    >
+                                      <Copy className="h-3 w-3" />
+                                    </Button>
+                                  </div>
+                                ))}
+                              </div>
+                            </CardContent>
+                          </Card>
+                        ))}
+                      </div>
+                    </TabsContent>
+                  </Tabs>
+                )}
               </CardContent>
             </Card>
           ) : (
