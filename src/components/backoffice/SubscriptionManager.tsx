@@ -55,7 +55,7 @@ const SubscriptionManager = ({ tenantId, tenantName, onUpdate }: SubscriptionMan
           <Building2 className="h-12 w-12 text-slate-500 mx-auto mb-4" />
           <h3 className="text-lg font-medium text-white mb-2">Selecciona un Cliente</h3>
           <p className="text-slate-400">
-            Para gestionar módulos, primero selecciona un cliente en la pestaña "Clientes" y haz clic en "Configurar".
+            Selecciona un cliente del menú superior para gestionar sus módulos.
           </p>
         </CardContent>
       </Card>

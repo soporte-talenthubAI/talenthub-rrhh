@@ -1,13 +1,14 @@
 /**
  * Panel de Administración TalentHub (Backoffice)
- * 
+ *
  * Acceso: /backoffice
  * Login: soporte@talenthub.com / TalentHub2024!
- * 
+ *
  * Funcionalidades:
- * - Gestionar clientes
- * - Habilitar/deshabilitar módulos por cliente
- * - Ver estadísticas generales
+ * - Gestionar clientes (CRUD)
+ * - Gestionar módulos por cliente
+ * - Gestionar usuarios por cliente
+ * - Templates de documentos
  */
 
 import { useState, useEffect } from "react";
@@ -19,20 +20,18 @@ import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Users, Settings, LogOut, Plus, Search,
-  CheckCircle, XCircle, Clock, CreditCard, Palette,
-  LayoutDashboard, Shield, FileText, DollarSign, Pencil, Trash2
+  CheckCircle, XCircle, Clock, CreditCard,
+  LayoutDashboard, Shield, FileText, Pencil, Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBackoffice, TalentHubClient } from "@/hooks/useBackoffice";
 import { supabase } from "@/integrations/supabase/client";
 import TemplateEditor from "@/components/backoffice/TemplateEditor";
-import ClientConfigEditor from "@/components/backoffice/ClientConfigEditor";
-import UserManagement from "@/components/backoffice/UserManagement";
 import SubscriptionManager from "@/components/backoffice/SubscriptionManager";
+import ClientUserManager from "@/components/backoffice/ClientUserManager";
 
 const Backoffice = () => {
   const { toast } = useToast();
@@ -44,8 +43,6 @@ const Backoffice = () => {
     createClient,
     updateClient,
     deleteClient,
-    getClientModules,
-    toggleClientModule
   } = useBackoffice();
 
   // Auth state
@@ -55,8 +52,7 @@ const Backoffice = () => {
 
   // UI state
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedClient, setSelectedClient] = useState<TalentHubClient | null>(null);
-  const [clientModules, setClientModules] = useState<Record<string, boolean>>({});
+  const [selectedClientId, setSelectedClientId] = useState<string>('');
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
   const [showEditClientDialog, setShowEditClientDialog] = useState(false);
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -71,6 +67,9 @@ const Backoffice = () => {
   });
   const [editClient, setEditClient] = useState<Partial<TalentHubClient>>({});
 
+  // Obtener cliente seleccionado
+  const selectedClient = clients.find(c => c.id === selectedClientId) || null;
+
   // Check auth on mount
   useEffect(() => {
     const auth = localStorage.getItem('backoffice_auth');
@@ -79,11 +78,17 @@ const Backoffice = () => {
     }
   }, []);
 
+  // Seleccionar primer cliente cuando se cargan
+  useEffect(() => {
+    if (clients.length > 0 && !selectedClientId) {
+      setSelectedClientId(clients[0].id);
+    }
+  }, [clients, selectedClientId]);
+
   // Login handler
   const handleLogin = async () => {
     setAuthLoading(true);
     try {
-      // Verificar credenciales contra la tabla de admins
       const { data, error } = await supabase
         .from('talenthub_admins')
         .select('*')
@@ -100,17 +105,14 @@ const Backoffice = () => {
         return;
       }
 
-      // TODO: Verificar password hash con bcrypt
-      // Por ahora, verificación simple para desarrollo
       if (loginData.password === 'TalentHub2024!' && data.email === 'soporte@talenthub.com') {
-        localStorage.setItem('backoffice_auth', JSON.stringify({ 
-          id: data.id, 
+        localStorage.setItem('backoffice_auth', JSON.stringify({
+          id: data.id,
           email: data.email,
           nombre: data.nombre,
-          role: data.role 
+          role: data.role
         }));
-        
-        // Actualizar último login
+
         await supabase
           .from('talenthub_admins')
           .update({ last_login: new Date().toISOString() })
@@ -145,51 +147,10 @@ const Backoffice = () => {
     setIsAuthenticated(false);
   };
 
-  // Load client modules when selecting a client
-  const handleSelectClient = async (client: TalentHubClient) => {
-    setSelectedClient(client);
-    const mods = await getClientModules(client.id);
-    const modMap: Record<string, boolean> = {};
-    modules.forEach(m => {
-      const clientMod = mods.find(cm => cm.module_id === m.id);
-      modMap[m.id] = clientMod?.is_enabled ?? m.is_core;
-    });
-    setClientModules(modMap);
-  };
-
-  // Toggle module for client
-  const handleToggleModule = async (moduleId: string, enabled: boolean) => {
-    if (!selectedClient) return;
-    
-    const success = await toggleClientModule(selectedClient.id, moduleId, enabled);
-    if (success) {
-      // Actualizar estado local
-      const newModules = { ...clientModules, [moduleId]: enabled };
-      setClientModules(newModules);
-      
-      // Sincronizar con client_config.modulos_habilitados
-      // Obtener lista de módulos habilitados (incluyendo core modules)
-      const enabledModuleIds = modules
-        .filter(m => m.is_core || newModules[m.id])
-        .map(m => m.key);
-      
-      // Actualizar client_config si existe
-      try {
-        await supabase
-          .from('client_config')
-          .update({ modulos_habilitados: enabledModuleIds })
-          .neq('id', '00000000-0000-0000-0000-000000000000'); // update all
-        console.log('✅ Módulos sincronizados con client_config:', enabledModuleIds);
-      } catch (e) {
-        console.log('⚠️ client_config no existe, solo se actualizó talenthub_client_modules');
-      }
-    }
-  };
-
   // Create new client
   const handleCreateClient = async () => {
     try {
-      await createClient(newClient as any);
+      const created = await createClient(newClient as any);
       setShowNewClientDialog(false);
       setNewClient({
         nombre: '',
@@ -199,6 +160,10 @@ const Backoffice = () => {
         plan: 'basic',
         status: 'active',
       });
+      // Seleccionar el cliente recién creado
+      if (created?.id) {
+        setSelectedClientId(created.id);
+      }
     } catch (error) {
       // Error handled in hook
     }
@@ -229,10 +194,6 @@ const Backoffice = () => {
       await updateClient(editClient.id, editClient);
       setShowEditClientDialog(false);
       setEditClient({});
-      // Update selectedClient if it's the one being edited
-      if (selectedClient?.id === editClient.id) {
-        setSelectedClient({ ...selectedClient, ...editClient } as TalentHubClient);
-      }
     } catch (error) {
       // Error handled in hook
     }
@@ -244,18 +205,19 @@ const Backoffice = () => {
     try {
       await deleteClient(clientToDelete.id);
       setShowDeleteConfirm(false);
-      setClientToDelete(null);
-      // Clear selection if deleted client was selected
-      if (selectedClient?.id === clientToDelete.id) {
-        setSelectedClient(null);
+      // Si se eliminó el cliente seleccionado, seleccionar otro
+      if (selectedClientId === clientToDelete.id) {
+        const remaining = clients.filter(c => c.id !== clientToDelete.id);
+        setSelectedClientId(remaining[0]?.id || '');
       }
+      setClientToDelete(null);
     } catch (error) {
       // Error handled in hook
     }
   };
 
   // Filter clients
-  const filteredClients = clients.filter(c => 
+  const filteredClients = clients.filter(c =>
     c.nombre.toLowerCase().includes(searchTerm.toLowerCase()) ||
     c.email_contacto?.toLowerCase().includes(searchTerm.toLowerCase())
   );
@@ -316,8 +278,8 @@ const Backoffice = () => {
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
-            <Button 
-              onClick={handleLogin} 
+            <Button
+              onClick={handleLogin}
               className="w-full bg-emerald-600 hover:bg-emerald-700"
               disabled={authLoading}
             >
@@ -360,15 +322,44 @@ const Backoffice = () => {
       {/* Header */}
       <header className="bg-slate-800 border-b border-slate-700 px-6 py-4">
         <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-emerald-500/20">
-              <Shield className="h-6 w-6 text-emerald-400" />
+          <div className="flex items-center gap-6">
+            <div className="flex items-center gap-3">
+              <div className="p-2 rounded-lg bg-emerald-500/20">
+                <Shield className="h-6 w-6 text-emerald-400" />
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white">TalentHub Backoffice</h1>
+                <p className="text-sm text-slate-400">Panel de Administración</p>
+              </div>
             </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">TalentHub Backoffice</h1>
-              <p className="text-sm text-slate-400">Panel de Administración</p>
+
+            {/* Selector de Cliente Global */}
+            <div className="flex items-center gap-2 ml-8">
+              <Building2 className="h-4 w-4 text-slate-400" />
+              <Select value={selectedClientId} onValueChange={setSelectedClientId}>
+                <SelectTrigger className="w-64 bg-slate-700 border-slate-600 text-white">
+                  <SelectValue placeholder="Seleccionar cliente..." />
+                </SelectTrigger>
+                <SelectContent>
+                  {clients.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      <div className="flex items-center gap-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: client.color_primario }}
+                        />
+                        {client.nombre}
+                        <Badge variant="outline" className="ml-2 text-xs">
+                          {client.plan}
+                        </Badge>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           </div>
+
           <Button onClick={handleLogout} variant="ghost" className="text-slate-300 hover:text-white">
             <LogOut className="h-4 w-4 mr-2" />
             Cerrar Sesión
@@ -388,21 +379,13 @@ const Backoffice = () => {
               <LayoutDashboard className="h-4 w-4 mr-2" />
               Módulos
             </TabsTrigger>
-            <TabsTrigger value="templates" className="data-[state=active]:bg-emerald-600">
-              <FileText className="h-4 w-4 mr-2" />
-              Templates
-            </TabsTrigger>
             <TabsTrigger value="users" className="data-[state=active]:bg-emerald-600">
               <Users className="h-4 w-4 mr-2" />
               Usuarios
             </TabsTrigger>
-            <TabsTrigger value="config" className="data-[state=active]:bg-emerald-600">
-              <Settings className="h-4 w-4 mr-2" />
-              Config Cliente
-            </TabsTrigger>
-            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-emerald-600">
-              <DollarSign className="h-4 w-4 mr-2" />
-              Suscripciones
+            <TabsTrigger value="templates" className="data-[state=active]:bg-emerald-600">
+              <FileText className="h-4 w-4 mr-2" />
+              Templates
             </TabsTrigger>
           </TabsList>
 
@@ -425,12 +408,12 @@ const Backoffice = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-400">Activos</p>
-                      <p className="text-2xl font-bold text-emerald-400">
-                        {clients.filter(c => c.status === 'active').length}
+                      <p className="text-sm text-slate-400">Plan Basic</p>
+                      <p className="text-2xl font-bold text-slate-400">
+                        {clients.filter(c => c.plan === 'basic').length}
                       </p>
                     </div>
-                    <CheckCircle className="h-8 w-8 text-emerald-400" />
+                    <CreditCard className="h-8 w-8 text-slate-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -438,12 +421,12 @@ const Backoffice = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-400">En Prueba</p>
-                      <p className="text-2xl font-bold text-yellow-400">
-                        {clients.filter(c => c.status === 'trial').length}
+                      <p className="text-sm text-slate-400">Plan Professional</p>
+                      <p className="text-2xl font-bold text-blue-400">
+                        {clients.filter(c => c.plan === 'professional').length}
                       </p>
                     </div>
-                    <Clock className="h-8 w-8 text-yellow-400" />
+                    <CreditCard className="h-8 w-8 text-blue-400" />
                   </div>
                 </CardContent>
               </Card>
@@ -451,7 +434,7 @@ const Backoffice = () => {
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div>
-                      <p className="text-sm text-slate-400">Enterprise</p>
+                      <p className="text-sm text-slate-400">Plan Enterprise</p>
                       <p className="text-2xl font-bold text-purple-400">
                         {clients.filter(c => c.plan === 'enterprise').length}
                       </p>
@@ -598,10 +581,14 @@ const Backoffice = () => {
                       </TableRow>
                     ) : (
                       filteredClients.map((client) => (
-                        <TableRow key={client.id} className="border-slate-700">
+                        <TableRow
+                          key={client.id}
+                          className={`border-slate-700 cursor-pointer transition-colors ${selectedClientId === client.id ? 'bg-emerald-900/20' : 'hover:bg-slate-700/50'}`}
+                          onClick={() => setSelectedClientId(client.id)}
+                        >
                           <TableCell>
                             <div className="flex items-center gap-3">
-                              <div 
+                              <div
                                 className="w-10 h-10 rounded-lg flex items-center justify-center text-white font-bold"
                                 style={{ backgroundColor: client.color_primario }}
                               >
@@ -621,16 +608,7 @@ const Backoffice = () => {
                           </TableCell>
                           <TableCell>{getStatusBadge(client.status)}</TableCell>
                           <TableCell>
-                            <div className="flex items-center gap-1">
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => handleSelectClient(client)}
-                                className="text-slate-300 hover:text-white"
-                                title="Configurar módulos"
-                              >
-                                <Settings className="h-4 w-4" />
-                              </Button>
+                            <div className="flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
                               <Button
                                 variant="ghost"
                                 size="sm"
@@ -847,171 +825,27 @@ const Backoffice = () => {
                 </div>
               </DialogContent>
             </Dialog>
-
-            {/* Client Config Panel */}
-            {selectedClient && (
-              <Card className="bg-slate-800 border-slate-700">
-                <CardHeader>
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-white flex items-center gap-2">
-                        <Palette className="h-5 w-5" />
-                        Configuración: {selectedClient.nombre}
-                      </CardTitle>
-                      <CardDescription className="text-slate-400">
-                        Plan actual: <span className="font-semibold text-emerald-400">{selectedClient.plan.toUpperCase()}</span>
-                      </CardDescription>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <Select
-                        value={selectedClient.plan}
-                        onValueChange={async (newPlan) => {
-                          await updateClient(selectedClient.id, { plan: newPlan as any });
-                          setSelectedClient({ ...selectedClient, plan: newPlan as any });
-                        }}
-                      >
-                        <SelectTrigger className="w-40 bg-slate-700 border-slate-600 text-white">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="basic">Basic</SelectItem>
-                          <SelectItem value="professional">Professional</SelectItem>
-                          <SelectItem value="enterprise">Enterprise</SelectItem>
-                        </SelectContent>
-                      </Select>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => setSelectedClient(null)}
-                        className="text-slate-400"
-                      >
-                        Cerrar
-                      </Button>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardContent>
-                  {/* Leyenda de planes */}
-                  <div className="flex gap-4 mb-4 text-xs">
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-slate-500"></span> Basic</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-blue-500"></span> Professional</span>
-                    <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-purple-500"></span> Enterprise</span>
-                  </div>
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {modules.map((module) => {
-                      // Verificar si el módulo está disponible para el plan del cliente
-                      const planOrder = { basic: 1, professional: 2, enterprise: 3 };
-                      const moduleMinPlan = module.plan_minimo || 'basic';
-                      const clientPlan = selectedClient.plan || 'basic';
-                      const isAvailableForPlan = planOrder[clientPlan as keyof typeof planOrder] >= planOrder[moduleMinPlan as keyof typeof planOrder];
-                      
-                      // Color según plan mínimo
-                      const planColors = {
-                        basic: 'border-slate-500',
-                        professional: 'border-blue-500',
-                        enterprise: 'border-purple-500',
-                      };
-                      
-                      return (
-                        <div
-                          key={module.id}
-                          className={`flex items-center justify-between p-4 rounded-lg bg-slate-700/50 border-2 ${planColors[moduleMinPlan as keyof typeof planColors] || 'border-slate-600'} ${!isAvailableForPlan ? 'opacity-50' : ''}`}
-                        >
-                          <div>
-                            <p className="font-medium text-white">{module.nombre}</p>
-                            <p className="text-sm text-slate-400">{module.descripcion}</p>
-                            <div className="flex gap-1 mt-1">
-                              {module.is_core && (
-                                <Badge variant="secondary" className="text-xs">
-                                  Core
-                                </Badge>
-                              )}
-                              <Badge 
-                                variant="outline" 
-                                className={`text-xs ${
-                                  moduleMinPlan === 'enterprise' ? 'border-purple-500 text-purple-400' :
-                                  moduleMinPlan === 'professional' ? 'border-blue-500 text-blue-400' :
-                                  'border-slate-500 text-slate-400'
-                                }`}
-                              >
-                                {moduleMinPlan}
-                              </Badge>
-                            </div>
-                          </div>
-                          <Switch
-                            checked={clientModules[module.id] ?? module.is_core}
-                            onCheckedChange={(checked) => handleToggleModule(module.id, checked)}
-                            disabled={module.is_core || !isAvailableForPlan}
-                            title={!isAvailableForPlan ? `Requiere plan ${moduleMinPlan}` : ''}
-                          />
-                        </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
           </TabsContent>
 
-          {/* Módulos Tab */}
+          {/* Módulos Tab - usa el cliente seleccionado */}
           <TabsContent value="modules">
-            <Card className="bg-slate-800 border-slate-700">
-              <CardHeader>
-                <CardTitle className="text-white">Catálogo de Módulos</CardTitle>
-                <CardDescription className="text-slate-400">
-                  Todos los módulos disponibles en la plataforma
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                  {modules.map((module) => (
-                    <div
-                      key={module.id}
-                      className="p-4 rounded-lg bg-slate-700/50 border border-slate-600"
-                    >
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <p className="font-medium text-white">{module.nombre}</p>
-                          <p className="text-sm text-slate-400 mt-1">{module.descripcion}</p>
-                        </div>
-                        {module.is_core && (
-                          <Badge className="bg-emerald-600">Core</Badge>
-                        )}
-                      </div>
-                      <div className="mt-3 flex items-center gap-2">
-                        <Badge variant="outline" className="text-xs border-slate-500 text-slate-300">
-                          Plan: {module.plan_minimo}
-                        </Badge>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
+            <SubscriptionManager
+              tenantId={selectedClientId || null}
+              tenantName={selectedClient?.nombre || null}
+            />
+          </TabsContent>
+
+          {/* Usuarios Tab - gestión de usuarios por cliente */}
+          <TabsContent value="users">
+            <ClientUserManager
+              clientId={selectedClientId || null}
+              clientName={selectedClient?.nombre || null}
+            />
           </TabsContent>
 
           {/* Templates Tab */}
           <TabsContent value="templates">
             <TemplateEditor />
-          </TabsContent>
-
-          {/* Usuarios Tab */}
-          <TabsContent value="users">
-            <UserManagement />
-          </TabsContent>
-
-          {/* Config Cliente Tab */}
-          <TabsContent value="config">
-            <ClientConfigEditor showTitle={true} />
-          </TabsContent>
-
-          {/* Suscripciones Tab */}
-          <TabsContent value="subscriptions">
-            <SubscriptionManager
-              tenantId={selectedClient?.id || null}
-              tenantName={selectedClient?.nombre || null}
-            />
           </TabsContent>
         </Tabs>
       </main>
@@ -1020,4 +854,3 @@ const Backoffice = () => {
 };
 
 export default Backoffice;
-
