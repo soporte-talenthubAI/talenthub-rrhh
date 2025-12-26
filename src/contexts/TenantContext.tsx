@@ -79,17 +79,18 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
       setTenant(tenantData);
 
       // 2. Cargar módulos habilitados para este cliente
+      // El module_id en talenthub_client_modules es la clave del módulo (ej: 'dashboard', 'employees')
       const { data: clientModules } = await (supabase as any)
         .from('talenthub_client_modules')
-        .select('module:talenthub_modules(key)')
+        .select('module_id')
         .eq('client_id', tenantId)
         .eq('is_enabled', true);
 
-      const moduleKeys = clientModules
-        ?.map((cm: any) => cm.module?.key)
+      const moduleIds = clientModules
+        ?.map((cm: any) => cm.module_id)
         .filter(Boolean) || [];
 
-      setEnabledModules(moduleKeys);
+      setEnabledModules(moduleIds);
 
       // Guardar tenant seleccionado
       localStorage.setItem(TENANT_STORAGE_KEY, tenantId);

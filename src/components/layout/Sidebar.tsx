@@ -1,14 +1,13 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
-import { 
-  Users, 
-  CalendarDays, 
-  GraduationCap, 
-  ClipboardList, 
-  BarChart3, 
-  Calendar,
+import {
+  Users,
+  CalendarDays,
+  GraduationCap,
+  ClipboardList,
+  BarChart3,
   ChevronLeft,
   ChevronRight,
   Shirt,
@@ -18,7 +17,7 @@ import {
   FileText,
   AlertCircle
 } from "lucide-react";
-import { getClientConfig } from "@/config/client";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface SidebarProps {
   activeModule: string;
@@ -122,26 +121,13 @@ const modules = [
 
 const Sidebar = ({ activeModule, onModuleChange }: SidebarProps) => {
   const [isCollapsed, setIsCollapsed] = useState(false);
-  const [enabledModules, setEnabledModules] = useState<string[]>([]);
+  const { enabledModules, loading } = useTenant();
 
-  // Cargar módulos habilitados desde la configuración del cliente
-  useEffect(() => {
-    const config = getClientConfig();
-    // Filtrar nulls y valores inválidos del array
-    const validModules = (config.modulosHabilitados || [])
-      .filter((m): m is string => m != null && typeof m === 'string' && m.length > 0);
-    
-    // Si hay módulos válidos configurados, usar esos; sino mostrar todos (desarrollo)
-    if (validModules.length > 0) {
-      setEnabledModules(validModules);
-    } else {
-      // Fallback: mostrar todos los módulos
-      setEnabledModules(modules.map(m => m.id));
-    }
-  }, []);
-
-  // Filtrar módulos según configuración
-  const visibleModules = modules.filter(m => enabledModules.includes(m.id));
+  // Filtrar módulos según configuración del tenant
+  // Si hay módulos habilitados del tenant, usar esos; sino mostrar todos (desarrollo/fallback)
+  const visibleModules = enabledModules.length > 0
+    ? modules.filter(m => enabledModules.includes(m.id))
+    : modules; // Fallback: mostrar todos si no hay tenant configurado
 
   return (
     <div className={cn(
