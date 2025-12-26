@@ -127,9 +127,13 @@ const Sidebar = ({ activeModule, onModuleChange }: SidebarProps) => {
   // Cargar módulos habilitados desde la configuración del cliente
   useEffect(() => {
     const config = getClientConfig();
-    // Si hay módulos configurados, usar esos; sino mostrar todos (desarrollo)
-    if (config.modulosHabilitados && config.modulosHabilitados.length > 0) {
-      setEnabledModules(config.modulosHabilitados);
+    // Filtrar nulls y valores inválidos del array
+    const validModules = (config.modulosHabilitados || [])
+      .filter((m): m is string => m != null && typeof m === 'string' && m.length > 0);
+    
+    // Si hay módulos válidos configurados, usar esos; sino mostrar todos (desarrollo)
+    if (validModules.length > 0) {
+      setEnabledModules(validModules);
     } else {
       // Fallback: mostrar todos los módulos
       setEnabledModules(modules.map(m => m.id));

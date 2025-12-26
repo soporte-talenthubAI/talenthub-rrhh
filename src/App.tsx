@@ -9,6 +9,7 @@ import Login from "./pages/Login";
 import NotFound from "./pages/NotFound";
 import Backoffice from "./pages/Backoffice";
 import { loadClientConfig } from "@/config/client";
+import { TenantProvider } from "@/contexts/TenantContext";
 
 const queryClient = new QueryClient();
 
@@ -40,13 +41,15 @@ const App = () => {
         <Toaster />
         <Sonner />
         <BrowserRouter>
-          <Routes>
-            <Route path="/login" element={<Login />} />
-            <Route path="/" element={<Index />} />
-            <Route path="/backoffice" element={<Backoffice />} />
-            {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
-            <Route path="*" element={<NotFound />} />
-          </Routes>
+          <TenantProvider>
+            <Routes>
+              <Route path="/login" element={<Login />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/backoffice" element={<Backoffice />} />
+              {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
+              <Route path="*" element={<NotFound />} />
+            </Routes>
+          </TenantProvider>
         </BrowserRouter>
       </TooltipProvider>
     </QueryClientProvider>

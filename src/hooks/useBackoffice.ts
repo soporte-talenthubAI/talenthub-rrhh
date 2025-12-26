@@ -182,6 +182,41 @@ export const useBackoffice = () => {
     }
   };
 
+  // Eliminar cliente
+  const deleteClient = async (id: string) => {
+    try {
+      // Primero eliminar módulos asociados
+      await supabase
+        .from('talenthub_client_modules')
+        .delete()
+        .eq('client_id', id);
+
+      // Luego eliminar el cliente
+      const { error } = await supabase
+        .from('talenthub_clients')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setClients(prev => prev.filter(c => c.id !== id));
+      toast({
+        title: "Cliente eliminado",
+        description: "El cliente ha sido eliminado correctamente",
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error deleting client:', error);
+      toast({
+        title: "Error",
+        description: "No se pudo eliminar el cliente",
+        variant: "destructive",
+      });
+      throw error;
+    }
+  };
+
   // Obtener módulos de un cliente
   const getClientModules = async (clientId: string): Promise<ClientModule[]> => {
     try {
@@ -299,10 +334,11 @@ export const useBackoffice = () => {
     modules,
     loading,
     isBackofficeAvailable,
-    
+
     // Acciones
     createClient,
     updateClient,
+    deleteClient,
     getClientModules,
     toggleClientModule,
     logAdminAction,

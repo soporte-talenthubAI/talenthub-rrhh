@@ -17,15 +17,35 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
   Building2, Palette, FileText, Upload, Save, 
-  CheckCircle, AlertCircle, Image as ImageIcon
+  CheckCircle, AlertCircle, Image as ImageIcon, LayoutGrid
 } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
 import { useToast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 import { 
   getClientConfig, 
   updateClientConfig, 
   uploadClientLogo,
   ClientConfig 
 } from "@/config/client";
+
+// Lista de todos los módulos disponibles
+const ALL_MODULES = [
+  { id: 'dashboard', name: 'Dashboard', description: 'Panel general y estadísticas', isCore: true },
+  { id: 'employees', name: 'Empleados', description: 'Gestión de legajos', isCore: true },
+  { id: 'attendance', name: 'Asistencia', description: 'Control de asistencia', isCore: false },
+  { id: 'vacations', name: 'Vacaciones', description: 'Gestión de vacaciones', isCore: false },
+  { id: 'absences', name: 'Ausencias', description: 'Permisos y ausencias', isCore: false },
+  { id: 'sanctions', name: 'Sanciones', description: 'Suspensiones y apercibimientos', isCore: false },
+  { id: 'documents', name: 'Documentos', description: 'Gestión de documentos', isCore: false },
+  { id: 'payroll', name: 'Nómina', description: 'Sueldos y pagos', isCore: false },
+  { id: 'training', name: 'Capacitaciones', description: 'Formación y desarrollo', isCore: false },
+  { id: 'uniforms', name: 'Uniformes', description: 'Entrega de uniformes', isCore: false },
+  { id: 'performance', name: 'Desempeño', description: 'Evaluación de rendimiento', isCore: false },
+  { id: 'selection', name: 'Selección', description: 'Reclutamiento', isCore: false },
+  { id: 'declarations', name: 'Declaraciones', description: 'Declaraciones juradas', isCore: false },
+  { id: 'consultations', name: 'Consultas', description: 'Visitas de consultores', isCore: false },
+];
 
 interface ClientConfigEditorProps {
   onSave?: () => void;
@@ -162,6 +182,10 @@ export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEdi
           <TabsTrigger value="documentos" className="data-[state=active]:bg-emerald-600">
             <FileText className="h-4 w-4 mr-2" />
             Documentos
+          </TabsTrigger>
+          <TabsTrigger value="modulos" className="data-[state=active]:bg-emerald-600">
+            <LayoutGrid className="h-4 w-4 mr-2" />
+            Módulos
           </TabsTrigger>
         </TabsList>
 
@@ -422,6 +446,85 @@ export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEdi
                   className="bg-slate-700 border-slate-600 text-white"
                   rows={2}
                 />
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* Módulos */}
+        <TabsContent value="modulos">
+          <Card className="bg-slate-800 border-slate-700">
+            <CardHeader>
+              <CardTitle className="text-white">Módulos Habilitados</CardTitle>
+              <CardDescription className="text-slate-400">
+                Selecciona qué módulos estarán disponibles para este cliente
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 gap-4">
+                {ALL_MODULES.map((module) => {
+                  const isEnabled = config.modulosHabilitados?.includes(module.id) || module.isCore;
+                  
+                  return (
+                    <div 
+                      key={module.id}
+                      className={cn(
+                        "flex items-start space-x-3 p-3 rounded-lg border transition-colors",
+                        isEnabled 
+                          ? "bg-emerald-900/30 border-emerald-600" 
+                          : "bg-slate-700/50 border-slate-600",
+                        module.isCore && "opacity-75"
+                      )}
+                    >
+                      <Checkbox
+                        id={`module-${module.id}`}
+                        checked={isEnabled}
+                        disabled={module.isCore}
+                        onCheckedChange={(checked) => {
+                          const currentModules = config.modulosHabilitados?.filter(m => m != null) || [];
+                          let newModules: string[];
+                          
+                          if (checked) {
+                            newModules = [...new Set([...currentModules, module.id])];
+                          } else {
+                            newModules = currentModules.filter(m => m !== module.id);
+                          }
+                          
+                          // Asegurar que los módulos core siempre estén
+                          ALL_MODULES.filter(m => m.isCore).forEach(m => {
+                            if (!newModules.includes(m.id)) {
+                              newModules.push(m.id);
+                            }
+                          });
+                          
+                          setConfig(prev => ({ ...prev, modulosHabilitados: newModules }));
+                        }}
+                        className="mt-0.5"
+                      />
+                      <div className="flex-1">
+                        <label 
+                          htmlFor={`module-${module.id}`}
+                          className="text-sm font-medium text-white cursor-pointer"
+                        >
+                          {module.name}
+                          {module.isCore && (
+                            <span className="ml-2 text-xs text-emerald-400">(Core)</span>
+                          )}
+                        </label>
+                        <p className="text-xs text-slate-400 mt-0.5">
+                          {module.description}
+                        </p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+              
+              <div className="mt-4 p-3 bg-slate-700/50 rounded-lg">
+                <p className="text-sm text-slate-300">
+                  <strong>Módulos habilitados:</strong>{' '}
+                  {config.modulosHabilitados?.filter(m => m != null).length || 0} de {ALL_MODULES.length}
+                </p>
               </div>
             </CardContent>
           </Card>

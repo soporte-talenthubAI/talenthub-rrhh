@@ -21,10 +21,10 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { 
-  Building2, Users, Settings, LogOut, Plus, Search, 
+import {
+  Building2, Users, Settings, LogOut, Plus, Search,
   CheckCircle, XCircle, Clock, CreditCard, Palette,
-  LayoutDashboard, Shield, FileText
+  LayoutDashboard, Shield, FileText, DollarSign, Pencil, Trash2
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBackoffice, TalentHubClient } from "@/hooks/useBackoffice";
@@ -32,18 +32,20 @@ import { supabase } from "@/integrations/supabase/client";
 import TemplateEditor from "@/components/backoffice/TemplateEditor";
 import ClientConfigEditor from "@/components/backoffice/ClientConfigEditor";
 import UserManagement from "@/components/backoffice/UserManagement";
+import SubscriptionManager from "@/components/backoffice/SubscriptionManager";
 
 const Backoffice = () => {
   const { toast } = useToast();
-  const { 
-    clients, 
-    modules, 
-    loading, 
+  const {
+    clients,
+    modules,
+    loading,
     isBackofficeAvailable,
     createClient,
     updateClient,
+    deleteClient,
     getClientModules,
-    toggleClientModule 
+    toggleClientModule
   } = useBackoffice();
 
   // Auth state
@@ -56,6 +58,9 @@ const Backoffice = () => {
   const [selectedClient, setSelectedClient] = useState<TalentHubClient | null>(null);
   const [clientModules, setClientModules] = useState<Record<string, boolean>>({});
   const [showNewClientDialog, setShowNewClientDialog] = useState(false);
+  const [showEditClientDialog, setShowEditClientDialog] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [clientToDelete, setClientToDelete] = useState<TalentHubClient | null>(null);
   const [newClient, setNewClient] = useState({
     nombre: '',
     nombre_corto: '',
@@ -64,6 +69,7 @@ const Backoffice = () => {
     plan: 'basic' as const,
     status: 'active' as const,
   });
+  const [editClient, setEditClient] = useState<Partial<TalentHubClient>>({});
 
   // Check auth on mount
   useEffect(() => {
@@ -193,6 +199,56 @@ const Backoffice = () => {
         plan: 'basic',
         status: 'active',
       });
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
+  // Open edit dialog
+  const handleOpenEditDialog = (client: TalentHubClient) => {
+    setEditClient({
+      id: client.id,
+      nombre: client.nombre,
+      nombre_corto: client.nombre_corto || '',
+      email_contacto: client.email_contacto || '',
+      telefono: client.telefono || '',
+      cuit: client.cuit || '',
+      direccion: client.direccion || '',
+      plan: client.plan,
+      status: client.status,
+      color_primario: client.color_primario,
+      color_secundario: client.color_secundario,
+    });
+    setShowEditClientDialog(true);
+  };
+
+  // Update client
+  const handleUpdateClient = async () => {
+    if (!editClient.id) return;
+    try {
+      await updateClient(editClient.id, editClient);
+      setShowEditClientDialog(false);
+      setEditClient({});
+      // Update selectedClient if it's the one being edited
+      if (selectedClient?.id === editClient.id) {
+        setSelectedClient({ ...selectedClient, ...editClient } as TalentHubClient);
+      }
+    } catch (error) {
+      // Error handled in hook
+    }
+  };
+
+  // Delete client
+  const handleDeleteClient = async () => {
+    if (!clientToDelete) return;
+    try {
+      await deleteClient(clientToDelete.id);
+      setShowDeleteConfirm(false);
+      setClientToDelete(null);
+      // Clear selection if deleted client was selected
+      if (selectedClient?.id === clientToDelete.id) {
+        setSelectedClient(null);
+      }
     } catch (error) {
       // Error handled in hook
     }
@@ -343,6 +399,10 @@ const Backoffice = () => {
             <TabsTrigger value="config" className="data-[state=active]:bg-emerald-600">
               <Settings className="h-4 w-4 mr-2" />
               Config Cliente
+            </TabsTrigger>
+            <TabsTrigger value="subscriptions" className="data-[state=active]:bg-emerald-600">
+              <DollarSign className="h-4 w-4 mr-2" />
+              Suscripciones
             </TabsTrigger>
           </TabsList>
 
@@ -561,15 +621,38 @@ const Backoffice = () => {
                           </TableCell>
                           <TableCell>{getStatusBadge(client.status)}</TableCell>
                           <TableCell>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleSelectClient(client)}
-                              className="text-slate-300 hover:text-white"
-                            >
-                              <Settings className="h-4 w-4 mr-2" />
-                              Configurar
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleSelectClient(client)}
+                                className="text-slate-300 hover:text-white"
+                                title="Configurar módulos"
+                              >
+                                <Settings className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => handleOpenEditDialog(client)}
+                                className="text-blue-400 hover:text-blue-300"
+                                title="Editar cliente"
+                              >
+                                <Pencil className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => {
+                                  setClientToDelete(client);
+                                  setShowDeleteConfirm(true);
+                                }}
+                                className="text-red-400 hover:text-red-300"
+                                title="Eliminar cliente"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))
@@ -578,6 +661,192 @@ const Backoffice = () => {
                 </Table>
               </CardContent>
             </Card>
+
+            {/* Edit Client Dialog */}
+            <Dialog open={showEditClientDialog} onOpenChange={setShowEditClientDialog}>
+              <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-white">Editar Cliente</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    Modifica los datos del cliente
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4 pt-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Nombre *</Label>
+                      <Input
+                        value={editClient.nombre || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, nombre: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Nombre Corto</Label>
+                      <Input
+                        value={editClient.nombre_corto || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, nombre_corto: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Email</Label>
+                      <Input
+                        type="email"
+                        value={editClient.email_contacto || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, email_contacto: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Teléfono</Label>
+                      <Input
+                        value={editClient.telefono || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, telefono: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">CUIT</Label>
+                      <Input
+                        value={editClient.cuit || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, cuit: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                        placeholder="XX-XXXXXXXX-X"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Dirección</Label>
+                      <Input
+                        value={editClient.direccion || ''}
+                        onChange={(e) => setEditClient(prev => ({ ...prev, direccion: e.target.value }))}
+                        className="bg-slate-700 border-slate-600 text-white"
+                      />
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Plan</Label>
+                      <Select
+                        value={editClient.plan || 'basic'}
+                        onValueChange={(v) => setEditClient(prev => ({ ...prev, plan: v as any }))}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="basic">Basic</SelectItem>
+                          <SelectItem value="professional">Professional</SelectItem>
+                          <SelectItem value="enterprise">Enterprise</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Estado</Label>
+                      <Select
+                        value={editClient.status || 'active'}
+                        onValueChange={(v) => setEditClient(prev => ({ ...prev, status: v as any }))}
+                      >
+                        <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                          <SelectValue />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="active">Activo</SelectItem>
+                          <SelectItem value="trial">Prueba</SelectItem>
+                          <SelectItem value="suspended">Suspendido</SelectItem>
+                          <SelectItem value="cancelled">Cancelado</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Color Primario</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={editClient.color_primario || '#10b981'}
+                          onChange={(e) => setEditClient(prev => ({ ...prev, color_primario: e.target.value }))}
+                          className="w-12 h-10 p-1 bg-slate-700 border-slate-600"
+                        />
+                        <Input
+                          value={editClient.color_primario || '#10b981'}
+                          onChange={(e) => setEditClient(prev => ({ ...prev, color_primario: e.target.value }))}
+                          className="bg-slate-700 border-slate-600 text-white flex-1"
+                        />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label className="text-slate-300">Color Secundario</Label>
+                      <div className="flex gap-2">
+                        <Input
+                          type="color"
+                          value={editClient.color_secundario || '#064e3b'}
+                          onChange={(e) => setEditClient(prev => ({ ...prev, color_secundario: e.target.value }))}
+                          className="w-12 h-10 p-1 bg-slate-700 border-slate-600"
+                        />
+                        <Input
+                          value={editClient.color_secundario || '#064e3b'}
+                          onChange={(e) => setEditClient(prev => ({ ...prev, color_secundario: e.target.value }))}
+                          className="bg-slate-700 border-slate-600 text-white flex-1"
+                        />
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex gap-3 pt-4">
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowEditClientDialog(false)}
+                      className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                    >
+                      Cancelar
+                    </Button>
+                    <Button
+                      onClick={handleUpdateClient}
+                      className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                    >
+                      Guardar Cambios
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
+
+            {/* Delete Confirmation Dialog */}
+            <Dialog open={showDeleteConfirm} onOpenChange={setShowDeleteConfirm}>
+              <DialogContent className="bg-slate-800 border-slate-700">
+                <DialogHeader>
+                  <DialogTitle className="text-white">Confirmar Eliminación</DialogTitle>
+                  <DialogDescription className="text-slate-400">
+                    ¿Estás seguro de que deseas eliminar al cliente <span className="font-semibold text-white">{clientToDelete?.nombre}</span>?
+                    Esta acción no se puede deshacer.
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="flex gap-3 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDeleteConfirm(false);
+                      setClientToDelete(null);
+                    }}
+                    className="flex-1 border-slate-600 text-slate-300 hover:bg-slate-700"
+                  >
+                    Cancelar
+                  </Button>
+                  <Button
+                    variant="destructive"
+                    onClick={handleDeleteClient}
+                    className="flex-1"
+                  >
+                    Eliminar
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
             {/* Client Config Panel */}
             {selectedClient && (
@@ -735,6 +1004,14 @@ const Backoffice = () => {
           {/* Config Cliente Tab */}
           <TabsContent value="config">
             <ClientConfigEditor showTitle={true} />
+          </TabsContent>
+
+          {/* Suscripciones Tab */}
+          <TabsContent value="subscriptions">
+            <SubscriptionManager
+              tenantId={selectedClient?.id || null}
+              tenantName={selectedClient?.nombre || null}
+            />
           </TabsContent>
         </Tabs>
       </main>
