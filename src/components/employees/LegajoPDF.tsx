@@ -77,11 +77,11 @@ const downloadPDF = async () => {
       }
     }
     
-    // Antigüedad por años completos según Ley de Contrato de Trabajo N° 20.744
+    // Antigüedad por años completos según Ley de Contrato de Trabajo N° 20.744 Art. 150
     if (antiguedadAnios < 0) return 0;
-    if (antiguedadAnios <= 5) return 14;    // Hasta 5 años: 14 días corridos
-    if (antiguedadAnios <= 10) return 21;   // Más de 5 hasta 10 años: 21 días corridos
-    if (antiguedadAnios <= 20) return 28;   // Más de 10 hasta 20 años: 28 días corridos
+    if (antiguedadAnios < 5) return 14;     // Menos de 5 años cumplidos: 14 días corridos
+    if (antiguedadAnios < 10) return 21;    // 5 años cumplidos hasta menos de 10: 21 días corridos
+    if (antiguedadAnios < 20) return 28;    // 10 años cumplidos hasta menos de 20: 28 días corridos
     return 35;                              // Más de 20 años: 35 días corridos
   };
 

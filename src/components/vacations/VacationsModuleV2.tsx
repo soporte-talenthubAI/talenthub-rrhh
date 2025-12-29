@@ -86,11 +86,11 @@ export const VacationsModule = () => {
       return 14;
     }
 
-    // Full years per law
+    // Full years per law (LCT Art. 150)
     const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    if (antiguedadAnios <= 5) return 14;
-    if (antiguedadAnios <= 10) return 21;
-    if (antiguedadAnios <= 20) return 28;
+    if (antiguedadAnios < 5) return 14;   // Menos de 5 años cumplidos
+    if (antiguedadAnios < 10) return 21;  // 5 años cumplidos hasta menos de 10
+    if (antiguedadAnios < 20) return 28;  // 10 años cumplidos hasta menos de 20
     return 35;
   };
 
