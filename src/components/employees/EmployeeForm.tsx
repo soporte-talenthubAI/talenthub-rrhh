@@ -11,6 +11,7 @@ import { FileText, Download, Save, ArrowLeft } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import LegajoPDF from "./LegajoPDF";
 import { calculateDetailedAntiquity } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 
 // Constantes para validaciones de edad
 const EDAD_MINIMA_LEGAL = 18;
@@ -136,37 +137,7 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
   };
 
 
-  const calculateVacationDays = (fechaIngreso: string) => {
-    if (!fechaIngreso) return 0;
-    
-    const fechaCorte = new Date(new Date().getFullYear(), 11, 31); // 31 de diciembre del año actual
-    const ingreso = new Date(fechaIngreso);
-    const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    
-    // Si ingresó este año, verificar casos especiales
-    if (ingreso.getFullYear() === new Date().getFullYear()) {
-      // Calcular días trabajados desde ingreso hasta 31 de diciembre (días calendario)
-      const diasTrabajados = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      
-      // Calcular meses trabajados
-      const mesesTrabajados = (fechaCorte.getTime() - ingreso.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-      
-      // Si trabajó menos de 6 meses: 1 día de vacaciones por cada 20 días de trabajo efectivo
-      if (mesesTrabajados < 6) {
-        return Math.round((diasTrabajados / 20) * 100) / 100; // Redondear a 2 decimales
-      } else {
-        // Si trabajó 6 meses o más en el año, le corresponden 14 días
-        return 14;
-      }
-    }
-    
-    // Antigüedad por años completos según Ley de Contrato de Trabajo N° 20.744 Art. 150
-    if (antiguedadAnios < 0) return 0;
-    if (antiguedadAnios < 5) return 14;     // Menos de 5 años cumplidos: 14 días corridos
-    if (antiguedadAnios < 10) return 21;    // 5 años cumplidos hasta menos de 10: 21 días corridos
-    if (antiguedadAnios < 20) return 28;    // 10 años cumplidos hasta menos de 20: 28 días corridos
-    return 35;                              // Más de 20 años: 35 días corridos
-  };
+  // Usar función centralizada de vacationUtils.ts (ya importada como calculateVacationDays)
 
   const handleSave = () => {
     // Validación: Nombres

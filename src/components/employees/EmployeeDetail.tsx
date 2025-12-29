@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Separator } from "@/components/ui/separator";
 import { formatDateLocal, calculateYearsOfService } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 import { 
   ArrowLeft, 
   Edit, 
@@ -37,30 +38,7 @@ const EmployeeDetail = ({ employee, onBack, onEdit }: EmployeeDetailProps) => {
   };
 
 
-  // Helper: calculate vacation days for current year using calendar days and decimals
-  const calcVacationDaysCurrentYear = (fechaIngreso?: string) => {
-    if (!fechaIngreso) return 0;
-    const ingreso = new Date(fechaIngreso);
-    const now = new Date();
-    const fechaCorte = new Date(now.getFullYear(), 11, 31);
-
-    // If joined this year, use proportional rule
-    if (ingreso.getFullYear() === now.getFullYear()) {
-      const diasTrabajados = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      const mesesTrabajados = (fechaCorte.getTime() - ingreso.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-      if (mesesTrabajados < 6) {
-        return Math.round((diasTrabajados / 20) * 100) / 100; // 2 decimales
-      }
-      return 14;
-    }
-
-    // Full years per law (LCT Art. 150)
-    const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    if (antiguedadAnios < 5) return 14;   // Menos de 5 años cumplidos
-    if (antiguedadAnios < 10) return 21;  // 5 años cumplidos hasta menos de 10
-    if (antiguedadAnios < 20) return 28;  // 10 años cumplidos hasta menos de 20
-    return 35;
-  };
+  // Usar función centralizada de vacationUtils.ts
 
   return (
     <div className="space-y-6">
@@ -225,7 +203,7 @@ const EmployeeDetail = ({ employee, onBack, onEdit }: EmployeeDetailProps) => {
                 <p className="text-xs text-foreground/70">Días de vacaciones usados</p>
               </div>
               <div className="text-center p-3 bg-secondary/10 rounded-lg">
-                <p className="text-2xl font-bold text-secondary">{calcVacationDaysCurrentYear(employee.fecha_ingreso || employee.fechaIngreso)}</p>
+                <p className="text-2xl font-bold text-secondary">{calculateVacationDays(employee.fecha_ingreso || employee.fechaIngreso)}</p>
                 <p className="text-xs text-foreground/70">Días de vacaciones disponibles</p>
               </div>
             </div>

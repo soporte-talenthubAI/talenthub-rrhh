@@ -10,6 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
 import { formatDateLocal } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 
 interface VacationFormProps {
   onBack: () => void;
@@ -205,41 +206,15 @@ const VacationForm = ({ onBack, vacation, employees, onSave }: VacationFormProps
   const currentYear = new Date().getFullYear();
   const vacationBalance = selectedEmployeeInfo ? getEmployeeVacationBalance(selectedEmployeeInfo.id, currentYear) : null;
   
-  // Helper: calculate vacation days for current year using calendar days and decimals
-  const calcVacationDaysCurrentYear = (fechaIngreso?: string) => {
-    if (!fechaIngreso) return 0;
-    const ingreso = new Date(fechaIngreso);
-    const now = new Date();
-    const fechaCorte = new Date(now.getFullYear(), 11, 31);
-
-    // If joined this year, use proportional rule
-    if (ingreso.getFullYear() === now.getFullYear()) {
-      const diasTrabajados = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      const mesesTrabajados = (fechaCorte.getTime() - ingreso.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-      if (mesesTrabajados < 6) {
-        return Math.round((diasTrabajados / 20) * 100) / 100; // 2 decimales
-      }
-      return 14;
-    }
-
-    // Full years per law (LCT Art. 150)
-    const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    if (antiguedadAnios < 5) return 14;   // Menos de 5 años cumplidos
-    if (antiguedadAnios < 10) return 21;  // 5 años cumplidos hasta menos de 10
-    if (antiguedadAnios < 20) return 28;  // 10 años cumplidos hasta menos de 20
-    return 35;
-  };
-  
+  // Usar función centralizada - siempre recalcular, ya incluye redondeo
   const vacationDaysInfo = selectedEmployeeInfo ? {
-    totalDays: vacationBalance && vacationBalance.dias_totales > 0 
-      ? vacationBalance.dias_totales 
-      : calcVacationDaysCurrentYear(selectedEmployeeInfo.fecha_ingreso || selectedEmployeeInfo.fechaIngreso),
+    totalDays: calculateVacationDays(selectedEmployeeInfo.fecha_ingreso || selectedEmployeeInfo.fechaIngreso),
     usedDays: vacationBalance?.dias_usados || 0,
     availableDays: 0 // Will be calculated below
   } : null;
   
   if (vacationDaysInfo) {
-    vacationDaysInfo.availableDays = Math.round(((vacationDaysInfo.totalDays - vacationDaysInfo.usedDays) + Number.EPSILON) * 100) / 100;
+    vacationDaysInfo.availableDays = Math.max(0, vacationDaysInfo.totalDays - vacationDaysInfo.usedDays);
   }
 
   return (

@@ -11,7 +11,8 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
-import { formatDateLocal, roundVacationDays } from "@/utils/dateUtils";
+import { formatDateLocal } from "@/utils/dateUtils";
+import { calculateVacationDays as calcVacationDays } from "@/utils/vacationUtils";
 
 const VacationsModule = () => {
   const { toast } = useToast();
@@ -22,39 +23,7 @@ const VacationsModule = () => {
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "pendiente" | "aprobado" | "rechazado">("all");
 
-  // Calculate vacation days based on seniority (following Argentine Labor Law N° 20.744)
-  const calculateVacationDays = (fechaIngreso: string) => {
-    if (!fechaIngreso) return 0;
-    
-    const fechaCorte = new Date(new Date().getFullYear(), 11, 31); // 31 de diciembre del año actual
-    const ingreso = new Date(fechaIngreso);
-    const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    
-    // Si ingresó este año, verificar casos especiales
-    if (ingreso.getFullYear() === new Date().getFullYear()) {
-      // Calcular días trabajados desde ingreso hasta 31 de diciembre (días calendario)
-      const diasTrabajados = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      
-      // Calcular meses trabajados
-      const mesesTrabajados = (fechaCorte.getTime() - ingreso.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-      
-      // Si trabajó menos de 6 meses: 1 día de vacaciones por cada 20 días de trabajo efectivo
-      if (mesesTrabajados < 6) {
-        return Math.floor(diasTrabajados / 20);
-      } else {
-        // Si trabajó 6 meses o más en el año, le corresponden 14 días
-        return 14;
-      }
-    }
-    
-    // Antigüedad por años completos según Ley de Contrato de Trabajo N° 20.744 Art. 150
-    // La antigüedad se computa al 31/12 del año en que se gozan las vacaciones
-    if (antiguedadAnios < 0) return 0;
-    if (antiguedadAnios < 5) return 14;     // Menos de 5 años cumplidos: 14 días corridos
-    if (antiguedadAnios < 10) return 21;    // 5 años cumplidos hasta menos de 10: 21 días corridos
-    if (antiguedadAnios < 20) return 28;    // 10 años cumplidos hasta menos de 20: 28 días corridos
-    return 35;                              // 20 años cumplidos o más: 35 días corridos
-  };
+  // Usar función centralizada de vacationUtils.ts (importada como calcVacationDays)
 
   // Calculate used vacation days (reset to 0)
   const getUsedVacationDays = (employeeId: number) => {
@@ -63,8 +32,8 @@ const VacationsModule = () => {
   };
 
   const employeesWithVacations = activeEmployees.map(emp => {
-    const totalDaysRaw = calculateVacationDays(emp.fecha_ingreso || emp.fechaIngreso || '');
-    const totalDays = roundVacationDays(totalDaysRaw); // Aplicar redondeo personalizado
+    // Usar función centralizada - ya incluye redondeo
+    const totalDays = calcVacationDays(emp.fecha_ingreso || emp.fechaIngreso || '');
     const usedDays = getUsedVacationDays(parseInt(emp.id) || 0);
     const remainingDays = totalDays - usedDays;
     

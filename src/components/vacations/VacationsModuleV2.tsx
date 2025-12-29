@@ -13,7 +13,8 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
 import { clientConfig } from "@/config/client";
-import { formatDateLocal, roundVacationDays } from "@/utils/dateUtils";
+import { formatDateLocal } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 
 export const VacationsModule = () => {
   const { toast } = useToast();
@@ -69,47 +70,28 @@ export const VacationsModule = () => {
     setView("edit");
   };
 
-  // Helper: calculate vacation days for current year using calendar days and decimals
-  const calcVacationDaysCurrentYear = (fechaIngreso?: string) => {
-    if (!fechaIngreso) return 0;
-    const ingreso = new Date(fechaIngreso);
-    const now = new Date();
-    const fechaCorte = new Date(now.getFullYear(), 11, 31);
+  // Usar función centralizada de vacationUtils.ts
+  // calculateVacationDays ya está importada y maneja todos los casos
 
-    // If joined this year, use proportional rule
-    if (ingreso.getFullYear() === now.getFullYear()) {
-      const diasTrabajados = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (24 * 60 * 60 * 1000)) + 1;
-      const mesesTrabajados = (fechaCorte.getTime() - ingreso.getTime()) / (30.44 * 24 * 60 * 60 * 1000);
-      if (mesesTrabajados < 6) {
-        return Math.round((diasTrabajados / 20) * 100) / 100; // 2 decimales
-      }
-      return 14;
-    }
-
-    // Full years per law (LCT Art. 150)
-    const antiguedadAnios = Math.floor((fechaCorte.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
-    if (antiguedadAnios < 5) return 14;   // Menos de 5 años cumplidos
-    if (antiguedadAnios < 10) return 21;  // 5 años cumplidos hasta menos de 10
-    if (antiguedadAnios < 20) return 28;  // 10 años cumplidos hasta menos de 20
-    return 35;
-  };
-
-  // Create employees with vacation information from database
+  // Create employees with vacation information
+  // SIEMPRE recalcular desde fecha_ingreso, ignorar vacation_balances.dias_totales
+  // vacation_balances solo se usa para dias_usados y dias_adeudados
   const employeesWithVacations = useMemo(() => {
     return getActiveEmployees().map(employee => {
       const currentYear = new Date().getFullYear();
       const balance = getEmployeeVacationBalance(employee.id, currentYear);
 
-      const computedDays = calcVacationDaysCurrentYear(employee.fecha_ingreso || employee.fechaIngreso);
-      const totalDaysRaw = balance && balance.dias_totales > 0 ? balance.dias_totales : computedDays;
-      const totalDays = roundVacationDays(totalDaysRaw); // Aplicar redondeo personalizado
+      // Usar función centralizada - siempre recalcula, ya incluye redondeo
+      const totalDays = calculateVacationDays(employee.fecha_ingreso || employee.fechaIngreso);
       const usados = balance?.dias_usados || 0;
+      const adeudados = balance?.dias_adeudados || 0;
 
       return {
         ...employee,
         vacationDays: totalDays,
         usedDays: usados,
-        availableDays: roundVacationDays(totalDays - usados), // Aplicar redondeo
+        owedDays: adeudados,
+        availableDays: Math.max(0, totalDays + adeudados - usados),
       };
     });
   }, [employees, vacationBalances, getActiveEmployees, getEmployeeVacationBalance]);
