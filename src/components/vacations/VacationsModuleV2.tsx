@@ -13,7 +13,7 @@ import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
 import { clientConfig } from "@/config/client";
-import { formatDateLocal } from "@/utils/dateUtils";
+import { formatDateLocal, roundVacationDays } from "@/utils/dateUtils";
 
 export const VacationsModule = () => {
   const { toast } = useToast();
@@ -101,14 +101,15 @@ export const VacationsModule = () => {
       const balance = getEmployeeVacationBalance(employee.id, currentYear);
 
       const computedDays = calcVacationDaysCurrentYear(employee.fecha_ingreso || employee.fechaIngreso);
-      const totalDays = balance && balance.dias_totales > 0 ? balance.dias_totales : computedDays;
+      const totalDaysRaw = balance && balance.dias_totales > 0 ? balance.dias_totales : computedDays;
+      const totalDays = roundVacationDays(totalDaysRaw); // Aplicar redondeo personalizado
       const usados = balance?.dias_usados || 0;
 
       return {
         ...employee,
         vacationDays: totalDays,
         usedDays: usados,
-        availableDays: Math.round(((totalDays - usados) + Number.EPSILON) * 100) / 100,
+        availableDays: roundVacationDays(totalDays - usados), // Aplicar redondeo
       };
     });
   }, [employees, vacationBalances, getActiveEmployees, getEmployeeVacationBalance]);

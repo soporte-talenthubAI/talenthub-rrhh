@@ -111,3 +111,19 @@ export const getCurrentDateString = (): string => {
   const day = String(today.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
 };
+
+/**
+ * Redondeo personalizado para días de vacaciones:
+ * - Si la parte decimal es <= 0.5: redondear hacia abajo
+ * - Si la parte decimal es > 0.5: redondear hacia arriba
+ * Ejemplo: 4.5 → 4, 4.6 → 5, 4.4 → 4
+ */
+export const roundVacationDays = (days: number): number => {
+  const decimal = days - Math.floor(days);
+  // Si es exactamente 0.5 o menos, redondear hacia abajo
+  if (decimal <= 0.5) {
+    return Math.floor(days);
+  }
+  // Si es mayor a 0.5, redondear hacia arriba
+  return Math.ceil(days);
+};

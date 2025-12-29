@@ -11,7 +11,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
-import { formatDateLocal } from "@/utils/dateUtils";
+import { formatDateLocal, roundVacationDays } from "@/utils/dateUtils";
 
 const VacationsModule = () => {
   const { toast } = useToast();
@@ -63,7 +63,8 @@ const VacationsModule = () => {
   };
 
   const employeesWithVacations = activeEmployees.map(emp => {
-    const totalDays = calculateVacationDays(emp.fecha_ingreso || emp.fechaIngreso || '');
+    const totalDaysRaw = calculateVacationDays(emp.fecha_ingreso || emp.fechaIngreso || '');
+    const totalDays = roundVacationDays(totalDaysRaw); // Aplicar redondeo personalizado
     const usedDays = getUsedVacationDays(parseInt(emp.id) || 0);
     const remainingDays = totalDays - usedDays;
     
