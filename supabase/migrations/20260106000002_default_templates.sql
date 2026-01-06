@@ -17,6 +17,7 @@ VALUES
 ON CONFLICT (id) DO NOTHING;
 
 -- Template por defecto: Certificado de Vacaciones
+-- Solo insertar si no existe
 INSERT INTO document_templates (
   template_type_id,
   nombre,
@@ -33,7 +34,8 @@ INSERT INTO document_templates (
   is_default,
   module_id,
   descripcion
-) VALUES (
+)
+SELECT
   'certificado_vacaciones',
   'Notificación de Vacaciones - Default',
   '1.0',
@@ -107,7 +109,11 @@ INSERT INTO document_templates (
   true,
   'vacations',
   'Template por defecto para notificaciones de vacaciones. Personalizable desde el backoffice.'
-) ON CONFLICT (template_type_id, nombre) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM document_templates 
+  WHERE template_type_id = 'certificado_vacaciones' 
+  AND nombre = 'Notificación de Vacaciones - Default'
+);
 
 -- Template por defecto: Constancia de Trabajo
 INSERT INTO document_templates (
@@ -126,7 +132,8 @@ INSERT INTO document_templates (
   is_default,
   module_id,
   descripcion
-) VALUES (
+)
+SELECT
   'constancia_trabajo',
   'Constancia de Trabajo - Default',
   '1.0',
@@ -172,7 +179,11 @@ INSERT INTO document_templates (
   true,
   'employees',
   'Template por defecto para constancias de trabajo.'
-) ON CONFLICT (template_type_id, nombre) DO NOTHING;
+WHERE NOT EXISTS (
+  SELECT 1 FROM document_templates 
+  WHERE template_type_id = 'constancia_trabajo' 
+  AND nombre = 'Constancia de Trabajo - Default'
+);
 
 -- Template por defecto: Apercibimiento
 INSERT INTO document_templates (
@@ -191,7 +202,8 @@ INSERT INTO document_templates (
   is_default,
   module_id,
   descripcion
-) VALUES (
+)
+SELECT
   'apercibimiento',
   'Apercibimiento - Default',
   '1.0',
@@ -255,22 +267,12 @@ INSERT INTO document_templates (
   true,
   'sanctions',
   'Template por defecto para apercibimientos.'
-) ON CONFLICT (template_type_id, nombre) DO NOTHING;
-
--- Agregar constraint único para evitar duplicados
-DO $$
-BEGIN
-  IF NOT EXISTS (
-    SELECT 1 FROM pg_constraint WHERE conname = 'unique_template_type_nombre'
-  ) THEN
-    ALTER TABLE document_templates 
-    ADD CONSTRAINT unique_template_type_nombre UNIQUE (template_type_id, nombre);
-  END IF;
-EXCEPTION WHEN others THEN
-  NULL; -- Si ya existe, ignorar
-END $$;
+WHERE NOT EXISTS (
+  SELECT 1 FROM document_templates 
+  WHERE template_type_id = 'apercibimiento' 
+  AND nombre = 'Apercibimiento - Default'
+);
 
 -- Comentarios
 COMMENT ON COLUMN document_templates.is_default IS 'true = template base del sistema, false = template personalizado por empresa';
 COMMENT ON COLUMN document_templates.module_id IS 'ID del módulo al que pertenece este template (vacations, employees, sanctions, etc.)';
-
