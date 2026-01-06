@@ -7,13 +7,13 @@
 -- Primero, verificar/crear los tipos de template necesarios
 INSERT INTO document_template_types (id, nombre, descripcion, categoria, campos_requeridos)
 VALUES 
-  ('certificado_vacaciones', 'Certificado de Vacaciones', 'Notificación de período de vacaciones', 'vacaciones', ARRAY['empleado_nombre', 'dni', 'fecha_inicio', 'fecha_fin', 'dias']),
-  ('constancia_trabajo', 'Constancia de Trabajo', 'Certificado de trabajo activo', 'empleados', ARRAY['empleado_nombre', 'dni', 'puesto', 'fecha_ingreso']),
-  ('recibo_uniforme', 'Recibo de Uniforme', 'Constancia de entrega de uniforme', 'uniformes', ARRAY['empleado_nombre', 'dni']),
-  ('certificado_capacitacion', 'Certificado de Capacitación', 'Certificado de curso completado', 'capacitaciones', ARRAY['empleado_nombre', 'dni', 'titulo_capacitacion', 'fecha']),
-  ('apercibimiento', 'Apercibimiento', 'Notificación de apercibimiento', 'sanciones', ARRAY['empleado_nombre', 'dni', 'motivo']),
-  ('suspension', 'Suspensión', 'Notificación de suspensión', 'sanciones', ARRAY['empleado_nombre', 'dni', 'motivo', 'dias_suspension']),
-  ('declaracion_domicilio', 'Declaración Jurada de Domicilio', 'Declaración de domicilio', 'declaraciones', ARRAY['empleado_nombre', 'dni', 'direccion'])
+  ('certificado_vacaciones', 'Certificado de Vacaciones', 'Notificación de período de vacaciones', 'vacaciones', '["empleado_nombre", "dni", "fecha_inicio", "fecha_fin", "dias"]'::jsonb),
+  ('constancia_trabajo', 'Constancia de Trabajo', 'Certificado de trabajo activo', 'empleados', '["empleado_nombre", "dni", "puesto", "fecha_ingreso"]'::jsonb),
+  ('recibo_uniforme', 'Recibo de Uniforme', 'Constancia de entrega de uniforme', 'uniformes', '["empleado_nombre", "dni"]'::jsonb),
+  ('certificado_capacitacion', 'Certificado de Capacitación', 'Certificado de curso completado', 'capacitaciones', '["empleado_nombre", "dni", "titulo_capacitacion", "fecha"]'::jsonb),
+  ('apercibimiento', 'Apercibimiento', 'Notificación de apercibimiento', 'sanciones', '["empleado_nombre", "dni", "motivo"]'::jsonb),
+  ('suspension', 'Suspensión', 'Notificación de suspensión', 'sanciones', '["empleado_nombre", "dni", "motivo", "dias_suspension"]'::jsonb),
+  ('declaracion_domicilio', 'Declaración Jurada de Domicilio', 'Declaración de domicilio', 'declaraciones', '["empleado_nombre", "dni", "direccion"]'::jsonb)
 ON CONFLICT (id) DO NOTHING;
 
 -- Template por defecto: Certificado de Vacaciones
