@@ -18,10 +18,15 @@ const VacationsModule = () => {
   const { toast } = useToast();
   const { getActiveEmployees } = useEmployees();
   const activeEmployees = getActiveEmployees();
-  const [view, setView] = useState<"list" | "form" | "detail">("list");
+  const [view, setView] = useState<"list" | "form" | "detail" | "edit">("list");
   const [selectedVacation, setSelectedVacation] = useState<any>(null);
   const [searchTerm, setSearchTerm] = useState("");
   const [filterStatus, setFilterStatus] = useState<"all" | "pendiente" | "aprobado" | "rechazado">("all");
+  
+  const handleEditVacation = (vacation: any) => {
+    setSelectedVacation(vacation);
+    setView("edit");
+  };
 
   // Usar función centralizada de vacationUtils.ts (importada como calcVacationDays)
 
@@ -305,6 +310,22 @@ const VacationsModule = () => {
     return <VacationForm onBack={handleBackToList} vacation={selectedVacation} employees={activeEmployees} onSave={addVacationRequest} />;
   }
 
+  if (view === "edit" && selectedVacation) {
+    return <VacationForm onBack={handleBackToList} vacation={selectedVacation} employees={activeEmployees} onSave={(data) => {
+      // Actualizar la solicitud existente
+      setVacationRequests(prev => prev.map(req => 
+        req.id === selectedVacation.id 
+          ? { ...req, ...data }
+          : req
+      ));
+      toast({
+        title: "Solicitud actualizada",
+        description: "La solicitud de vacaciones ha sido modificada correctamente.",
+      });
+      handleBackToList();
+    }} />;
+  }
+
   if (view === "detail" && selectedVacation) {
     // Buscar el empleado asociado a la solicitud
     const vacEmployee = employees.find((e: any) => 
@@ -556,6 +577,10 @@ const VacationsModule = () => {
                         Constancia
                       </Button>
                     )}
+                    {/* Botón Editar - siempre visible para poder modificar solicitudes */}
+                    <Button variant="outline" size="sm" onClick={() => handleEditVacation(vacation)}>
+                      Editar
+                    </Button>
                   </div>
                 </CardContent>
               </Card>

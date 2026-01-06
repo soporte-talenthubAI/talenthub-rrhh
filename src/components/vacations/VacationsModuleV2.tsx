@@ -611,34 +611,32 @@ export const VacationsModule = () => {
                             Constancia
                           </Button>
                         )}
-                        {vacation.estado !== "aprobado" && (
-                          <>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleEditVacation(vacation);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4 mr-1" />
-                              Editar
-                            </Button>
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="text-red-600 border-red-600 hover:bg-red-50"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (confirm('¿Estás seguro de que quieres eliminar esta solicitud?')) {
-                                  deleteVacationRequest(vacation.id);
-                                }
-                              }}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
-                          </>
-                        )}
+                        {/* Botón Editar - siempre visible para poder modificar solicitudes */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleEditVacation(vacation);
+                          }}
+                        >
+                          <Pencil className="h-4 w-4 mr-1" />
+                          Editar
+                        </Button>
+                        {/* Botón Eliminar - siempre visible */}
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="text-red-600 border-red-600 hover:bg-red-50"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            if (confirm('¿Estás seguro de que quieres eliminar esta solicitud?')) {
+                              deleteVacationRequest(vacation.id);
+                            }
+                          }}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       </div>
                     </div>
                   </CardContent>
