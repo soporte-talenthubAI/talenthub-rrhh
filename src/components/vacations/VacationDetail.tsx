@@ -3,18 +3,30 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, Download, Edit, Check, X } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
-import { formatDateLocal } from "@/utils/dateUtils";
+import { formatDateLocal, calculateDetailedAntiquity } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 
 interface VacationDetailProps {
   vacation: any;
+  employee?: any;
+  usedDays?: number;
   onBack: () => void;
   onApprove: () => void;
   onReject: () => void;
   onGeneratePDF: () => void;
 }
 
-const VacationDetail = ({ vacation, onBack, onApprove, onReject, onGeneratePDF }: VacationDetailProps) => {
+const VacationDetail = ({ vacation, employee, usedDays = 0, onBack, onApprove, onReject, onGeneratePDF }: VacationDetailProps) => {
   const { toast } = useToast();
+  
+  // Calcular datos del empleado
+  const employeeName = employee ? `${employee.nombres} ${employee.apellidos}` : vacation.empleadoNombre;
+  const cargo = employee?.puesto || employee?.cargo || 'No especificado';
+  const sector = employee?.departamento || employee?.sector || 'No especificado';
+  const fechaIngreso = employee?.fecha_ingreso || employee?.fechaIngreso;
+  const antiguedad = fechaIngreso ? calculateDetailedAntiquity(fechaIngreso) : 'No disponible';
+  const diasCorrespondientes = fechaIngreso ? calculateVacationDays(fechaIngreso) : 0;
+  const diasDisponibles = Math.max(0, diasCorrespondientes - usedDays);
 
   const handleApprove = () => {
     onApprove();
@@ -70,27 +82,27 @@ const VacationDetail = ({ vacation, onBack, onApprove, onReject, onGeneratePDF }
           <CardContent className="space-y-4">
             <div>
               <p className="text-sm font-medium text-foreground/70">Nombre Completo</p>
-              <p className="text-foreground font-semibold">{vacation.empleadoNombre}</p>
+              <p className="text-foreground font-semibold">{employeeName}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Cargo</p>
-              <p className="text-foreground">Supervisora</p>
+              <p className="text-foreground">{cargo}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Sector</p>
-              <p className="text-foreground">Granja</p>
+              <p className="text-foreground">{sector}</p>
             </div>
             
             <div>
               <p className="text-sm font-medium text-foreground/70">Fecha de Ingreso</p>
-              <p className="text-foreground">15/03/2020</p>
+              <p className="text-foreground">{fechaIngreso ? formatDateLocal(fechaIngreso) : 'No disponible'}</p>
             </div>
 
             <div>
               <p className="text-sm font-medium text-foreground/70">Antigüedad</p>
-              <p className="text-foreground">4 años, 8 meses</p>
+              <p className="text-foreground">{antiguedad}</p>
             </div>
           </CardContent>
         </Card>
@@ -150,19 +162,19 @@ const VacationDetail = ({ vacation, onBack, onApprove, onReject, onGeneratePDF }
           <CardContent className="space-y-4">
             <div className="p-4 bg-success/10 rounded-lg">
               <p className="text-sm font-medium text-foreground/70">Días Correspondientes</p>
-              <p className="text-3xl font-bold text-success">21</p>
+              <p className="text-3xl font-bold text-success">{diasCorrespondientes}</p>
               <p className="text-xs text-foreground/60">según antigüedad</p>
             </div>
             
             <div className="p-4 bg-warning/10 rounded-lg">
               <p className="text-sm font-medium text-foreground/70">Días Utilizados</p>
-              <p className="text-3xl font-bold text-warning">8</p>
+              <p className="text-3xl font-bold text-warning">{usedDays}</p>
               <p className="text-xs text-foreground/60">incluye esta solicitud</p>
             </div>
             
             <div className="p-4 bg-primary/10 rounded-lg">
               <p className="text-sm font-medium text-foreground/70">Días Disponibles</p>
-              <p className="text-3xl font-bold text-primary">{vacation.diasDisponibles}</p>
+              <p className="text-3xl font-bold text-primary">{diasDisponibles}</p>
               <p className="text-xs text-foreground/60">restantes</p>
             </div>
 

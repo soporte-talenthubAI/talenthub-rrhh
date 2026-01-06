@@ -9,6 +9,7 @@ import { Calendar, Save, ArrowLeft, Download } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import html2pdf from "html2pdf.js";
 import { formatDateLocal } from "@/utils/dateUtils";
+import { calculateVacationDays } from "@/utils/vacationUtils";
 
 interface VacationFormProps {
   onBack: () => void;
@@ -317,62 +318,70 @@ const VacationForm = ({ onBack, vacation, employees, onSave }: VacationFormProps
             <CardTitle className="text-foreground">Información del Empleado</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {formData.empleadoId ? (
-              <>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-semibold text-foreground mb-2">
-                    {(() => {
-                      const emp = employees.find(e => e.id.toString() === formData.empleadoId);
-                      return emp ? `${emp.nombres} ${emp.apellidos}` : '';
-                    })()}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-foreground/70">Cargo</p>
-                      <p className="text-foreground">Supervisora</p>
-                    </div>
-                    <div>
-                      <p className="text-foreground/70">Sector</p>
-                      <p className="text-foreground">Granja</p>
+            {(() => {
+              const emp = employees.find(e => e.id.toString() === formData.empleadoId);
+              if (!emp) {
+                return (
+                  <div className="p-8 text-center">
+                    <Calendar className="h-12 w-12 text-foreground/40 mx-auto mb-4" />
+                    <p className="text-foreground/70">
+                      Selecciona un empleado para ver su información
+                    </p>
+                  </div>
+                );
+              }
+              
+              const diasCorrespondientes = calculateVacationDays(emp.fecha_ingreso || emp.fechaIngreso);
+              const diasUsados = 0; // TODO: obtener de vacation_balances
+              const diasDisponibles = Math.max(0, diasCorrespondientes - diasUsados);
+              
+              return (
+                <>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h3 className="font-semibold text-foreground mb-2">
+                      {emp.nombres} {emp.apellidos}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-foreground/70">Cargo</p>
+                        <p className="text-foreground">{emp.puesto || emp.cargo || 'No especificado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-foreground/70">Sector</p>
+                        <p className="text-foreground">{emp.departamento || emp.sector || 'No especificado'}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
-                <div className="space-y-3">
-                  <h4 className="font-medium text-foreground">Balance de Vacaciones</h4>
-                  
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="p-3 bg-success/10 rounded-lg">
-                      <p className="text-sm text-foreground/70">Días Correspondientes</p>
-                      <p className="text-2xl font-bold text-success">21</p>
+                  <div className="space-y-3">
+                    <h4 className="font-medium text-foreground">Balance de Vacaciones</h4>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="p-3 bg-success/10 rounded-lg">
+                        <p className="text-sm text-foreground/70">Días Correspondientes</p>
+                        <p className="text-2xl font-bold text-success">{diasCorrespondientes}</p>
+                      </div>
+                      <div className="p-3 bg-warning/10 rounded-lg">
+                        <p className="text-sm text-foreground/70">Días Utilizados</p>
+                        <p className="text-2xl font-bold text-warning">{diasUsados}</p>
+                      </div>
                     </div>
-                    <div className="p-3 bg-warning/10 rounded-lg">
-                      <p className="text-sm text-foreground/70">Días Utilizados</p>
-                      <p className="text-2xl font-bold text-warning">8</p>
+                    
+                    <div className="p-3 bg-primary/10 rounded-lg">
+                      <p className="text-sm text-foreground/70">Días Disponibles</p>
+                      <p className="text-2xl font-bold text-primary">{diasDisponibles}</p>
                     </div>
                   </div>
-                  
-                  <div className="p-3 bg-primary/10 rounded-lg">
-                    <p className="text-sm text-foreground/70">Días Disponibles</p>
-                    <p className="text-2xl font-bold text-primary">13</p>
-                  </div>
-                </div>
 
-                <div className="p-3 bg-muted/30 rounded-lg">
-                  <p className="text-sm text-foreground/70 mb-1">Cálculo según legislación argentina</p>
-                  <p className="text-xs text-foreground/60">
-                    Corresponden 21 días por año trabajado según antigüedad
-                  </p>
-                </div>
-              </>
-            ) : (
-              <div className="p-8 text-center">
-                <Calendar className="h-12 w-12 text-foreground/40 mx-auto mb-4" />
-                <p className="text-foreground/70">
-                  Selecciona un empleado para ver su información
-                </p>
-              </div>
-            )}
+                  <div className="p-3 bg-muted/30 rounded-lg">
+                    <p className="text-sm text-foreground/70 mb-1">Cálculo según legislación argentina</p>
+                    <p className="text-xs text-foreground/60">
+                      Corresponden {diasCorrespondientes} días según antigüedad (LCT Art. 150)
+                    </p>
+                  </div>
+                </>
+              );
+            })()}
           </CardContent>
         </Card>
       </div>

@@ -306,12 +306,23 @@ const VacationsModule = () => {
   }
 
   if (view === "detail" && selectedVacation) {
+    // Buscar el empleado asociado a la solicitud
+    const vacEmployee = employees.find((e: any) => 
+      e.id === selectedVacation.employee_id || 
+      e.id === selectedVacation.empleadoId ||
+      `${e.nombres} ${e.apellidos}` === selectedVacation.empleadoNombre
+    );
+    // Buscar días usados del empleado
+    const empWithVac = employeesWithVacations.find(e => e.id === vacEmployee?.id);
+    
     return (
       <VacationDetail
         vacation={selectedVacation}
+        employee={vacEmployee}
+        usedDays={empWithVac?.usedVacationDays || 0}
         onBack={handleBackToList}
-          onApprove={() => approveVacationRequest(selectedVacation.id)}
-          onReject={() => rejectVacationRequest(selectedVacation.id)}
+        onApprove={() => approveVacationRequest(selectedVacation.id)}
+        onReject={() => rejectVacationRequest(selectedVacation.id)}
         onGeneratePDF={() => generateVacationCertificate(selectedVacation)}
       />
     );

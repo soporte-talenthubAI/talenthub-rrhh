@@ -347,9 +347,20 @@ export const VacationsModule = () => {
   }
 
   if (view === "detail" && selectedVacation) {
+    // Buscar el empleado asociado a la solicitud
+    const vacEmployee = employees.find(e => 
+      e.id === selectedVacation.employee_id || 
+      e.id === selectedVacation.empleadoId ||
+      `${e.nombres} ${e.apellidos}` === selectedVacation.empleadoNombre
+    );
+    // Buscar días usados del empleado
+    const empWithVac = employeesWithVacations.find(e => e.id === vacEmployee?.id);
+    
     return (
       <VacationDetail
         vacation={selectedVacation}
+        employee={vacEmployee}
+        usedDays={empWithVac?.usedDays || 0}
         onBack={handleBackToList}
         onApprove={() => handleApproveVacation(selectedVacation.id)}
         onReject={() => handleRejectVacation(selectedVacation.id)}

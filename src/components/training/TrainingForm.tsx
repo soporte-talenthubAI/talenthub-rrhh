@@ -315,33 +315,45 @@ const TrainingForm = ({ onBack, training, employees }: TrainingFormProps) => {
             <CardTitle className="text-foreground">Información del Empleado</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {formData.empleadoId ? (
-              <>
-                <div className="p-4 bg-muted/50 rounded-lg">
-                  <h3 className="font-semibold text-foreground mb-2">
-                    {employees.find(e => e.id.toString() === formData.empleadoId) 
-                      ? `${employees.find(e => e.id.toString() === formData.empleadoId)?.nombres} ${employees.find(e => e.id.toString() === formData.empleadoId)?.apellidos}`
-                      : "Empleado"}
-                  </h3>
-                  <div className="grid grid-cols-2 gap-4 text-sm">
-                    <div>
-                      <p className="text-foreground/70">Cargo</p>
-                      <p className="text-foreground">Supervisora</p>
-                    </div>
-                    <div>
-                      <p className="text-foreground/70">Sector</p>
-                      <p className="text-foreground">Granja</p>
-                    </div>
-                    <div>
-                      <p className="text-foreground/70">Antigüedad</p>
-                      <p className="text-foreground">4 años</p>
-                    </div>
-                    <div>
-                      <p className="text-foreground/70">Estado</p>
-                      <p className="text-foreground">Activo</p>
+            {(() => {
+              const emp = employees.find(e => e.id.toString() === formData.empleadoId);
+              if (!emp) return null;
+              
+              // Calcular antigüedad
+              const fechaIngreso = emp.fecha_ingreso || emp.fechaIngreso;
+              let antiguedad = 'No disponible';
+              if (fechaIngreso) {
+                const ingreso = new Date(fechaIngreso);
+                const ahora = new Date();
+                const anos = Math.floor((ahora.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                antiguedad = anos === 1 ? '1 año' : `${anos} años`;
+              }
+              
+              return (
+                <>
+                  <div className="p-4 bg-muted/50 rounded-lg">
+                    <h3 className="font-semibold text-foreground mb-2">
+                      {emp.nombres} {emp.apellidos}
+                    </h3>
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <p className="text-foreground/70">Cargo</p>
+                        <p className="text-foreground">{emp.puesto || emp.cargo || 'No especificado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-foreground/70">Sector</p>
+                        <p className="text-foreground">{emp.departamento || emp.sector || 'No especificado'}</p>
+                      </div>
+                      <div>
+                        <p className="text-foreground/70">Antigüedad</p>
+                        <p className="text-foreground">{antiguedad}</p>
+                      </div>
+                      <div>
+                        <p className="text-foreground/70">Estado</p>
+                        <p className="text-foreground">{emp.estado === 'activo' ? 'Activo' : emp.estado || 'Activo'}</p>
+                      </div>
                     </div>
                   </div>
-                </div>
 
                 <div className="space-y-3">
                   <h4 className="font-medium text-foreground">Historial de Capacitaciones</h4>
@@ -367,7 +379,9 @@ const TrainingForm = ({ onBack, training, employees }: TrainingFormProps) => {
                   </ul>
                 </div>
               </>
-            ) : (
+            );
+            })()}
+            {!formData.empleadoId && (
               <div className="p-8 text-center">
                 <GraduationCap className="h-12 w-12 text-foreground/40 mx-auto mb-4" />
                 <p className="text-foreground/70">

@@ -236,25 +236,40 @@ const PerformanceForm = ({ onBack, evaluation, employees }: PerformanceFormProps
               </Select>
             </div>
 
-            {formData.empleadoId && (
-              <div className="p-4 bg-muted/50 rounded-lg">
-                <h4 className="font-semibold text-foreground mb-2">Información del Empleado</h4>
-                <div className="space-y-1 text-sm">
-                  <div className="flex justify-between">
-                    <span className="text-foreground/70">Cargo:</span>
-                    <span className="text-foreground">Supervisora</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground/70">Sector:</span>
-                    <span className="text-foreground">Granja</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-foreground/70">Antigüedad:</span>
-                    <span className="text-foreground">4 años</span>
+            {(() => {
+              const emp = employees.find(e => e.id.toString() === formData.empleadoId);
+              if (!emp) return null;
+              
+              // Calcular antigüedad
+              const fechaIngreso = emp.fecha_ingreso || emp.fechaIngreso;
+              let antiguedad = 'No disponible';
+              if (fechaIngreso) {
+                const ingreso = new Date(fechaIngreso);
+                const ahora = new Date();
+                const anos = Math.floor((ahora.getTime() - ingreso.getTime()) / (365.25 * 24 * 60 * 60 * 1000));
+                antiguedad = anos === 1 ? '1 año' : `${anos} años`;
+              }
+              
+              return (
+                <div className="p-4 bg-muted/50 rounded-lg">
+                  <h4 className="font-semibold text-foreground mb-2">Información del Empleado</h4>
+                  <div className="space-y-1 text-sm">
+                    <div className="flex justify-between">
+                      <span className="text-foreground/70">Cargo:</span>
+                      <span className="text-foreground">{emp.puesto || emp.cargo || 'No especificado'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground/70">Sector:</span>
+                      <span className="text-foreground">{emp.departamento || emp.sector || 'No especificado'}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span className="text-foreground/70">Antigüedad:</span>
+                      <span className="text-foreground">{antiguedad}</span>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              );
+            })()}
           </CardContent>
         </Card>
 
