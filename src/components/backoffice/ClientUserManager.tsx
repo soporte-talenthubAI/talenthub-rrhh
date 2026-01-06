@@ -26,6 +26,7 @@ import {
   CheckCircle,
   XCircle,
   Trash2,
+  KeyRound,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
@@ -51,7 +52,9 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
-  const [inviteData, setInviteData] = useState({ email: '', role: 'viewer' as const });
+  const [showPasswordDialog, setShowPasswordDialog] = useState(false);
+  const [inviteData, setInviteData] = useState({ email: '', password: '', role: 'viewer' as const });
+  const [passwordChangeData, setPasswordChangeData] = useState<{ userId: string; email: string; newPassword: string }>({ userId: '', email: '', newPassword: '' });
 
   // Si no hay cliente seleccionado
   if (!clientId) {
@@ -93,19 +96,28 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
     loadUsers();
   }, [clientId]);
 
-  // Invitar usuario
+  // Crear usuario - usa Edge Function para crear en Auth (sin confirmación de email)
   const handleInviteUser = async () => {
-    if (!inviteData.email) {
+    if (!inviteData.email || !inviteData.password) {
       toast({
         title: 'Error',
-        description: 'Ingresa un email válido',
+        description: 'Ingresa email y contraseña',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    if (inviteData.password.length < 6) {
+      toast({
+        title: 'Error',
+        description: 'La contraseña debe tener al menos 6 caracteres',
         variant: 'destructive',
       });
       return;
     }
 
     try {
-      // Verificar si el usuario ya existe
+      // Verificar si el usuario ya existe en este tenant
       const existingUser = users.find(u => u.email === inviteData.email);
       if (existingUser) {
         toast({
@@ -116,10 +128,33 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
         return;
       }
 
-      // Crear el registro de usuario
+      // 1. Crear usuario en Supabase Auth usando Edge Function (sin confirmación de email)
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'create_user',
+          email: inviteData.email,
+          password: inviteData.password,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al crear usuario');
+      }
+
+      // 2. Crear el registro en tenant_users
       const { data, error } = await (supabase as any)
         .from('tenant_users')
         .insert({
+          user_id: result.user?.id || null,
           tenant_id: clientId,
           email: inviteData.email,
           role: inviteData.role,
@@ -133,17 +168,74 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
 
       setUsers(prev => [data, ...prev]);
       setShowInviteDialog(false);
-      setInviteData({ email: '', role: 'viewer' });
+      setInviteData({ email: '', password: '', role: 'viewer' });
 
       toast({
-        title: 'Usuario invitado',
-        description: `Se ha agregado ${inviteData.email} como ${inviteData.role}`,
+        title: 'Usuario creado exitosamente',
+        description: `${inviteData.email} puede acceder inmediatamente con la contraseña definida`,
       });
-    } catch (error) {
-      console.error('Error inviting user:', error);
+    } catch (error: any) {
+      console.error('Error creating user:', error);
       toast({
         title: 'Error',
-        description: 'No se pudo invitar al usuario',
+        description: error.message || 'No se pudo crear el usuario',
+        variant: 'destructive',
+      });
+    }
+  };
+
+  // Resetear contraseña de un usuario
+  const handleResetPassword = async (userId: string, email: string) => {
+    setPasswordChangeData({ userId, email, newPassword: generateTempPassword() });
+    setShowPasswordDialog(true);
+  };
+
+  // Confirmar cambio de contraseña - usa Edge Function
+  const handleConfirmPasswordChange = async () => {
+    if (!passwordChangeData.newPassword || passwordChangeData.newPassword.length < 6) {
+      toast({
+        title: 'Error',
+        description: 'La contraseña debe tener al menos 6 caracteres',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    try {
+      // Llamar a la Edge Function para cambiar contraseña
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'update_password',
+          userId: passwordChangeData.userId,
+          password: passwordChangeData.newPassword,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al cambiar contraseña');
+      }
+
+      setShowPasswordDialog(false);
+      setPasswordChangeData({ userId: '', email: '', newPassword: '' });
+      
+      toast({
+        title: 'Contraseña actualizada',
+        description: `La contraseña de ${passwordChangeData.email} ha sido cambiada`,
+      });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo cambiar la contraseña',
         variant: 'destructive',
       });
     }
@@ -338,14 +430,26 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                       )}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleDeleteUser(user.id)}
-                        className="text-red-400 hover:text-red-300"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      <div className="flex gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleResetPassword(user.id, user.email)}
+                          className="text-yellow-400 hover:text-yellow-300"
+                          title="Restablecer contraseña"
+                        >
+                          <KeyRound className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleDeleteUser(user.id)}
+                          className="text-red-400 hover:text-red-300"
+                          title="Eliminar usuario"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -355,13 +459,13 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
         </CardContent>
       </Card>
 
-      {/* Invite Dialog */}
+      {/* Crear Usuario Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="bg-slate-800 border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Agregar Usuario</DialogTitle>
+            <DialogTitle className="text-white">Crear Usuario</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Agrega un nuevo usuario a {clientName}
+              Crear un nuevo usuario para {clientName}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
@@ -372,6 +476,16 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                 value={inviteData.email}
                 onChange={(e) => setInviteData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="usuario@ejemplo.com"
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label className="text-slate-300">Contraseña</Label>
+              <Input
+                type="password"
+                value={inviteData.password}
+                onChange={(e) => setInviteData(prev => ({ ...prev, password: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
@@ -403,7 +517,46 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                 onClick={handleInviteUser}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
               >
-                Agregar Usuario
+                Crear Usuario
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Cambiar Contraseña Dialog */}
+      <Dialog open={showPasswordDialog} onOpenChange={setShowPasswordDialog}>
+        <DialogContent className="bg-slate-800 border-slate-700">
+          <DialogHeader>
+            <DialogTitle className="text-white">Cambiar Contraseña</DialogTitle>
+            <DialogDescription className="text-slate-400">
+              Cambiar contraseña de: {passwordChangeData.email}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-4">
+            <div className="space-y-2">
+              <Label className="text-slate-300">Nueva Contraseña</Label>
+              <Input
+                type="password"
+                value={passwordChangeData.newPassword}
+                onChange={(e) => setPasswordChangeData(prev => ({ ...prev, newPassword: e.target.value }))}
+                placeholder="Mínimo 6 caracteres"
+                className="bg-slate-700 border-slate-600 text-white"
+              />
+            </div>
+            <div className="flex gap-3 pt-4">
+              <Button
+                variant="outline"
+                onClick={() => setShowPasswordDialog(false)}
+                className="flex-1 border-slate-600 text-slate-300"
+              >
+                Cancelar
+              </Button>
+              <Button
+                onClick={handleConfirmPasswordChange}
+                className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+              >
+                Guardar Contraseña
               </Button>
             </div>
           </div>
