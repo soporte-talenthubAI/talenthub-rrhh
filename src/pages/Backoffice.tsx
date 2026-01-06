@@ -24,7 +24,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   Building2, Users, Settings, LogOut, Plus, Search,
   CheckCircle, XCircle, Clock, CreditCard,
-  LayoutDashboard, Shield, FileText, Pencil, Trash2
+  LayoutDashboard, Shield, FileText, Pencil, Trash2, Briefcase
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { useBackoffice, TalentHubClient } from "@/hooks/useBackoffice";
@@ -32,6 +32,7 @@ import { supabase } from "@/integrations/supabase/client";
 import TemplateEditor from "@/components/backoffice/TemplateEditor";
 import SubscriptionManager from "@/components/backoffice/SubscriptionManager";
 import ClientUserManager from "@/components/backoffice/ClientUserManager";
+import CustomCatalogsEditor from "@/components/backoffice/CustomCatalogsEditor";
 
 const Backoffice = () => {
   const { toast } = useToast();
@@ -386,6 +387,10 @@ const Backoffice = () => {
             <TabsTrigger value="templates" className="data-[state=active]:bg-emerald-600">
               <FileText className="h-4 w-4 mr-2" />
               Templates
+            </TabsTrigger>
+            <TabsTrigger value="catalogs" className="data-[state=active]:bg-emerald-600">
+              <Briefcase className="h-4 w-4 mr-2" />
+              Catálogos
             </TabsTrigger>
           </TabsList>
 
@@ -846,6 +851,11 @@ const Backoffice = () => {
           {/* Templates Tab */}
           <TabsContent value="templates">
             <TemplateEditor />
+          </TabsContent>
+
+          {/* Catálogos Personalizables Tab */}
+          <TabsContent value="catalogs">
+            <CustomCatalogsEditor />
           </TabsContent>
         </Tabs>
       </main>

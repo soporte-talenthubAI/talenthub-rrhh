@@ -11,10 +11,17 @@ import EmployeeDetail from "./EmployeeDetail";
 import { EmployeeImport } from "./EmployeeImport";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
+import { useCustomCatalogs } from "@/hooks/useCustomCatalogs";
 
 const EmployeeList = () => {
   const { toast } = useToast();
   const { employees, addEmployee, updateEmployee, deleteEmployee, refetch } = useEmployees();
+  const { getSelectOptions } = useCustomCatalogs();
+  
+  // Catálogos dinámicos para filtros
+  const sectoresOptions = getSelectOptions('sectores');
+  const estadosOptions = getSelectOptions('estados_empleado');
+  
   const [view, setView] = useState<"list" | "form" | "detail" | "import">("list");
   const [selectedEmployee, setSelectedEmployee] = useState<any>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -173,9 +180,11 @@ const EmployeeList = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los sectores</SelectItem>
-                <SelectItem value="administracion">Administración</SelectItem>
-                <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                <SelectItem value="produccion">Producción</SelectItem>
+                {sectoresOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
             
@@ -185,8 +194,11 @@ const EmployeeList = () => {
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">Todos los estados</SelectItem>
-                <SelectItem value="activo">Activo</SelectItem>
-                <SelectItem value="inactivo">Inactivo</SelectItem>
+                {estadosOptions.map(option => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>

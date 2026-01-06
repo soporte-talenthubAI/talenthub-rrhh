@@ -12,6 +12,7 @@ import { useToast } from "@/hooks/use-toast";
 import LegajoPDF from "./LegajoPDF";
 import { calculateDetailedAntiquity } from "@/utils/dateUtils";
 import { calculateVacationDays } from "@/utils/vacationUtils";
+import { useCustomCatalogs } from "@/hooks/useCustomCatalogs";
 
 // Constantes para validaciones de edad
 const EDAD_MINIMA_LEGAL = 18;
@@ -58,6 +59,13 @@ const licenseTypes = [
 
 const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeFormProps) => {
   const { toast } = useToast();
+  const { getSelectOptions, loading: catalogsLoading } = useCustomCatalogs();
+  
+  // Catálogos personalizables
+  const puestosOptions = getSelectOptions('puestos');
+  const sectoresOptions = getSelectOptions('sectores');
+  const tiposContratoOptions = getSelectOptions('tipos_contrato');
+  const estadosEmpleadoOptions = getSelectOptions('estados_empleado');
   const [formData, setFormData] = useState({
     // Datos Personales
     nombres: employee?.nombres || "",
@@ -530,11 +538,11 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                   <SelectValue placeholder="Seleccionar puesto" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="operario-mantenimiento">Operario Mantenimiento</SelectItem>
-                  <SelectItem value="operario-produccion">Operario Producción</SelectItem>
-                  <SelectItem value="recursos-humanos">Recursos Humanos</SelectItem>
-                  <SelectItem value="administracion">Administración</SelectItem>
-                  <SelectItem value="chofer">Chofer</SelectItem>
+                  {puestosOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -546,9 +554,11 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                   <SelectValue placeholder="Seleccionar sector" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="administracion">Administración</SelectItem>
-                  <SelectItem value="mantenimiento">Mantenimiento</SelectItem>
-                  <SelectItem value="produccion">Producción</SelectItem>
+                  {sectoresOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -560,11 +570,11 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                   <SelectValue placeholder="Seleccionar tipo de contrato" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="indefinido">Contrato por tiempo indeterminado</SelectItem>
-                  <SelectItem value="temporal">Contrato temporal</SelectItem>
-                  <SelectItem value="obra">Contrato por obra o servicio</SelectItem>
-                  <SelectItem value="pasantia">Pasantía</SelectItem>
-                  <SelectItem value="eventual">Trabajo eventual</SelectItem>
+                  {tiposContratoOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
@@ -599,10 +609,11 @@ const EmployeeForm = ({ onBack, onSave, employee, isEditing = false }: EmployeeF
                   <SelectValue placeholder="Seleccionar estado" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="activo">Activo</SelectItem>
-                  <SelectItem value="inactivo">Inactivo</SelectItem>
-                  <SelectItem value="licencia">En Licencia</SelectItem>
-                  <SelectItem value="suspension">Suspendido</SelectItem>
+                  {estadosEmpleadoOptions.map(option => (
+                    <SelectItem key={option.value} value={option.value}>
+                      {option.label}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
