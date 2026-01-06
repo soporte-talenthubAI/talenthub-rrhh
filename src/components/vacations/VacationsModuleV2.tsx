@@ -12,9 +12,10 @@ import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
 import html2pdf from "html2pdf.js";
-import { clientConfig } from "@/config/client";
+import { clientConfig, getClientConfig } from "@/config/client";
 import { formatDateLocal } from "@/utils/dateUtils";
 import { calculateVacationDays } from "@/utils/vacationUtils";
+import { getTemplateForModule, replacePlaceholders } from "@/services/templateService";
 
 export const VacationsModule = () => {
   const { toast } = useToast();
@@ -105,7 +106,7 @@ export const VacationsModule = () => {
     return diffDays + 1; // +1 to include final day
   };
 
-  // Generate vacation certificate PDF
+  // Generate vacation certificate PDF - Usa templates dinámicos de BD
   const generateVacationCertificate = async (vacation: any) => {
     if (!vacation || vacation.estado !== "aprobado") {
       toast({
@@ -117,10 +118,11 @@ export const VacationsModule = () => {
     }
 
     try {
+      const config = getClientConfig();
       const empleadoNombre = vacation.employee 
         ? `${vacation.employee.nombres} ${vacation.employee.apellidos}` 
-        : "Empleado";
-      const dni = vacation.employee?.dni || "";
+        : (vacation.empleadoNombre || "Empleado");
+      const dni = vacation.employee?.dni || vacation.empleadoDni || "";
       const inicio = vacation.fecha_inicio ? formatDateLocal(vacation.fecha_inicio) : "";
       const fin = vacation.fecha_fin ? formatDateLocal(vacation.fecha_fin) : "";
       const emitido = new Date().toLocaleDateString("es-AR");
@@ -130,6 +132,83 @@ export const VacationsModule = () => {
       const safeName = empleadoNombre.replace(/\s+/g, "_");
       const fileName = `Notificacion_Vacaciones_${safeName}_${periodo}.pdf`;
 
+      // Intentar obtener template personalizado de la BD
+      let htmlContent = "";
+      const template = await getTemplateForModule('vacations', 'certificado_vacaciones');
+      
+      if (template && template.contenido_html) {
+        console.log('✅ [VACACIONES] Usando template personalizado:', template.nombre);
+        // Usar template de la BD y reemplazar placeholders
+        htmlContent = replacePlaceholders(template.contenido_html, {
+          nombres: vacation.employee?.nombres || "",
+          apellidos: vacation.employee?.apellidos || "",
+          dni: dni,
+          cuil: vacation.employee?.cuil || "",
+          direccion: vacation.employee?.direccion || "",
+          puesto: vacation.employee?.puesto || "",
+          departamento: vacation.employee?.departamento || "",
+          fecha_ingreso: vacation.employee?.fecha_ingreso || "",
+          vacation: { fecha_inicio: inicio, fecha_fin: fin, dias: dias },
+        }, {
+          "{{periodo}}": periodo,
+          "{{dias}}": dias.toString(),
+        });
+      } else {
+        console.log('ℹ️ [VACACIONES] Usando template por defecto');
+        // Fallback: template por defecto con datos de clientConfig
+        htmlContent = `
+          <div style="text-align:center; margin-bottom:12px;">
+            <h2 style="margin:0 0 4px 0; font-size:16px; font-weight:bold;">${config.nombre.toUpperCase()}</h2>
+          </div>
+          
+          <h1 style="text-align:center; font-size:18px; font-weight:bold; margin:12px 0;">NOTIFICACIÓN DE VACACIONES</h1>
+          
+          <div style="margin-bottom:10px;">
+            <p style="margin:4px 0;"><strong>Nombre y Apellido:</strong> ${empleadoNombre.toUpperCase()}</p>
+            <p style="margin:4px 0;"><strong>DNI:</strong> ${dni}</p>
+          </div>
+          
+          <p style="line-height:1.5; text-align:justify; margin:12px 0;">
+            En cumplimiento de la Legislación vigente Art. 154 de la Ley de Contrato de trabajo, se le notifica que el período de descanso anual ${periodo} es de <strong>${dias} días</strong>, comenzando desde el <strong>${inicio}</strong> hasta el <strong>${fin}</strong> inclusive.
+          </p>
+          
+          <p style="margin:16px 0 20px 0;">Sin otro particular saludo muy atte.</p>
+          
+          <div style="margin-bottom:12px;">
+            <p style="margin:2px 0;"><strong>Empleador:</strong> ${config.firmaEmpresaNombre || config.nombre}</p>
+            <p style="margin:2px 0;"><strong>Domicilio:</strong> ${config.direccion || ""}</p>
+            <p style="margin:2px 0;"><strong>Cuit:</strong> ${config.cuit || ""}</p>
+          </div>
+          
+          <p style="margin:12px 0;"><strong>Fecha:</strong> ${emitido}</p>
+          
+          <div style="text-align:center; margin:20px 0 12px 0;">
+            <p style="font-style:italic; margin-bottom:4px;">${config.nombreCorto || config.nombre}</p>
+          </div>
+          
+          <p style="margin:16px 0 8px 0;">Me notifico de la comunicación que antecede, tomando debida nota.</p>
+          
+          <p style="margin:8px 0;"><strong>Fecha:</strong> ________________</p>
+          
+          <div style="margin:24px 0; text-align:center;">
+            <div style="border-top:1px solid #000; width:220px; margin:0 auto 6px;"></div>
+            <p style="margin:0; font-size:10px;">FIRMA DEL EMPLEADO</p>
+          </div>
+          
+          <div style="border-top:2px solid #000; margin:24px 0 16px 0;"></div>
+          
+          <p style="margin:12px 0 8px 0;">Certifico haber gozado del período de vacaciones arriba mencionado, reintegrandome en la fecha de conformidad a mis ocupaciones</p>
+          
+          <p style="margin:8px 0;"><strong>Fecha:</strong> ________________</p>
+          
+          <div style="margin:24px 0; text-align:center;">
+            <div style="border-top:1px solid #000; width:220px; margin:0 auto 6px;"></div>
+            <p style="margin:0; font-size:10px;">FIRMA DEL EMPLEADO</p>
+          </div>
+        `;
+      }
+
+      // Crear contenedor con el HTML
       const container = document.createElement("div");
       container.style.width = "210mm";
       container.style.minHeight = "297mm";
@@ -139,57 +218,7 @@ export const VacationsModule = () => {
       container.style.backgroundColor = "#fff";
       container.style.boxSizing = "border-box";
       container.style.fontSize = "11px";
-      
-      container.innerHTML = `
-        <div style="text-align:center; margin-bottom:12px;">
-          <h2 style="margin:0 0 4px 0; font-size:16px; font-weight:bold;">${clientConfig.nombre.toUpperCase()}</h2>
-        </div>
-        
-        <h1 style="text-align:center; font-size:18px; font-weight:bold; margin:12px 0;">NOTIFICACIÓN DE VACACIONES</h1>
-        
-        <div style="margin-bottom:10px;">
-          <p style="margin:4px 0;"><strong>Nombre y Apellido:</strong> ${empleadoNombre.toUpperCase()}</p>
-          <p style="margin:4px 0;"><strong>DNI:</strong> ${dni}</p>
-        </div>
-        
-        <p style="line-height:1.5; text-align:justify; margin:12px 0;">
-          En cumplimiento de la Legislación vigente Art. 154 de la Ley de Contrato de trabajo, se le notifica que el período de descanso anual ${periodo} es de <strong>${dias} días</strong>, comenzando desde el <strong>${inicio}</strong> hasta el <strong>${fin}</strong> inclusive.
-        </p>
-        
-        <p style="margin:16px 0 20px 0;">Sin otro particular saludo muy atte.</p>
-        
-        <div style="margin-bottom:12px;">
-          <p style="margin:2px 0;"><strong>Empleador:</strong> FOLCO MARCOS DENIS.</p>
-          <p style="margin:2px 0;"><strong>Domicilio:</strong> Avda. José Hernández N°90, Rio Primero (5127) Córdoba.</p>
-          <p style="margin:2px 0;"><strong>Cuit:</strong> 20-24088189-7</p>
-        </div>
-        
-        <p style="margin:12px 0;"><strong>Fecha:</strong> ${emitido}</p>
-        
-        <div style="text-align:center; margin:20px 0 12px 0;">
-          <p style="font-style:italic; margin-bottom:4px;">${clientConfig.nombreCorto}</p>
-        </div>
-        
-        <p style="margin:16px 0 8px 0;">Me notifico de la comunicación que antecede, tomando debida nota.</p>
-        
-        <p style="margin:8px 0;"><strong>Fecha:</strong> ________________</p>
-        
-        <div style="margin:24px 0; text-align:center;">
-          <div style="border-top:1px solid #000; width:220px; margin:0 auto 6px;"></div>
-          <p style="margin:0; font-size:10px;">FIRMA DEL EMPLEADO</p>
-        </div>
-        
-        <div style="border-top:2px solid #000; margin:24px 0 16px 0;"></div>
-        
-        <p style="margin:12px 0 8px 0;">Certifico haber gozado del período de vacaciones arriba mencionado, reintegrandome en la fecha de conformidad a mis ocupaciones</p>
-        
-        <p style="margin:8px 0;"><strong>Fecha:</strong> ________________</p>
-        
-        <div style="margin:24px 0; text-align:center;">
-          <div style="border-top:1px solid #000; width:220px; margin:0 auto 6px;"></div>
-          <p style="margin:0; font-size:10px;">FIRMA DEL EMPLEADO</p>
-        </div>
-      `;
+      container.innerHTML = htmlContent;
 
       const opt = {
         margin: 0,
