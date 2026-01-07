@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface VacationRequest {
   id: string;
@@ -36,19 +37,29 @@ export const useVacations = () => {
   const [vacationBalances, setVacationBalances] = useState<VacationBalance[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchVacationRequests = async () => {
+    // Si no hay tenant, no cargar datos
+    if (!tenant?.id) {
+      setVacationRequests([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('vacation_requests')
         .select(`
           *,
-          employee:employees (
+          employee:employees!inner (
             nombres,
             apellidos,
-            dni
+            dni,
+            tenant_id
           )
         `)
+        .eq('employee.tenant_id', tenant.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -64,10 +75,18 @@ export const useVacations = () => {
   };
 
   const fetchVacationBalances = async () => {
+    // Si no hay tenant, no cargar datos
+    if (!tenant?.id) {
+      setVacationBalances([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('vacation_balances')
         .select('*')
+        .eq('tenant_id', tenant.id)
         .order('year', { ascending: false });
 
       if (error) throw error;
@@ -88,7 +107,10 @@ export const useVacations = () => {
     try {
       const { data, error } = await supabase
         .from('vacation_requests')
-        .insert([requestData])
+        .insert([{
+          ...requestData,
+          tenant_id: tenant?.id
+        }])
         .select(`
           *,
           employee:employees (
@@ -146,6 +168,7 @@ export const useVacations = () => {
         .select('*')
         .eq('employee_id', request.employee_id)
         .eq('year', currentYear)
+        .eq('tenant_id', tenant?.id)
         .single();
 
       if (balanceError && balanceError.code !== 'PGRST116') throw balanceError;
@@ -185,7 +208,8 @@ export const useVacations = () => {
             employee_id: request.employee_id,
             year: currentYear,
             dias_totales: vacationDays,
-            dias_usados: request.dias_solicitados
+            dias_usados: request.dias_solicitados,
+            tenant_id: tenant?.id
           })
           .select()
           .single();
@@ -247,6 +271,7 @@ export const useVacations = () => {
           {
             employee_id: employeeId,
             year,
+            tenant_id: tenant?.id,
             ...balanceData
           }
         ])
@@ -372,8 +397,10 @@ export const useVacations = () => {
   };
 
   useEffect(() => {
-    Promise.all([fetchVacationRequests(), fetchVacationBalances()]);
-  }, []);
+    if (tenant?.id) {
+      Promise.all([fetchVacationRequests(), fetchVacationBalances()]);
+    }
+  }, [tenant?.id]);
 
   return {
     vacationRequests,
