@@ -134,6 +134,23 @@ export const useBackoffice = () => {
           })));
       }
 
+      // Crear registro en client_config para este tenant
+      await supabase
+        .from('client_config')
+        .insert({
+          tenant_id: data.id,
+          nombre: data.nombre,
+          nombre_corto: data.nombre_corto || '',
+          email: data.email_contacto || '',
+          telefono: data.telefono || '',
+          cuit: data.cuit || '',
+          direccion: data.direccion || '',
+          color_primario: data.color_primario || '#16a34a',
+          color_secundario: data.color_secundario || '#0891b2',
+          is_configured: false,
+          modulos_habilitados: ['dashboard', 'employees'],
+        });
+
       setClients(prev => [...prev, data]);
       toast({
         title: "Cliente creado",
