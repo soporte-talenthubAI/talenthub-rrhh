@@ -1013,7 +1013,7 @@ const Backoffice = () => {
 
           {/* Templates Tab */}
           <TabsContent value="templates">
-            <TemplateEditor />
+            <TemplateEditor tenantId={selectedClientId} />
           </TabsContent>
 
           {/* Catálogos Personalizables Tab */}

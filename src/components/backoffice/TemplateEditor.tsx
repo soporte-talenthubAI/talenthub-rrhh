@@ -110,9 +110,10 @@ const PLACEHOLDERS = [
 
 interface TemplateEditorProps {
   onBack?: () => void;
+  tenantId?: string | null;
 }
 
-export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
+export const TemplateEditor = ({ onBack, tenantId }: TemplateEditorProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -131,17 +132,19 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [filterModule, setFilterModule] = useState<string>("all");
 
-  // Cargar datos iniciales
+  // Cargar datos iniciales - recargar cuando cambie el tenant
   useEffect(() => {
-    loadData();
-  }, []);
+    if (tenantId) {
+      loadData();
+    }
+  }, [tenantId]);
 
   const loadData = async () => {
     setLoading(true);
     try {
       const [types, temps] = await Promise.all([
         getTemplateTypes(),
-        getAllTemplates(),
+        getAllTemplates(tenantId || undefined),
       ]);
       setTemplateTypes(types);
       setTemplates(temps);
@@ -186,6 +189,7 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
         template_type_id: selectedTemplate.template_type_id,
         nombre: selectedTemplate.nombre,
         contenido_html: editedContent,
+        tenant_id: selectedTemplate.tenant_id || tenantId || null,
       });
       
       if (result) {
@@ -264,6 +268,7 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
         contenido_html: defaultHtml,
         is_active: true,
         is_default: false,
+        tenant_id: tenantId || null,
       }, pdfFile || undefined);
       
       if (result) {
@@ -352,6 +357,20 @@ export const TemplateEditor = ({ onBack }: TemplateEditorProps) => {
       });
     }
   };
+
+  if (!tenantId) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardContent className="p-8 text-center">
+          <FileText className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Selecciona un Cliente</h3>
+          <p className="text-slate-400">
+            Selecciona un cliente del menú superior para gestionar sus templates.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   if (loading) {
     return (

@@ -42,6 +42,8 @@ export interface DynamicPDFParams {
   };
   documentId: string;
   customData?: Record<string, any>;
+  // ID del tenant para multi-tenancy
+  tenantId?: string;
   // Datos específicos según tipo de documento
   sanction?: {
     motivo: string;
@@ -90,19 +92,19 @@ const TEMPLATE_TYPE_MAP: Record<string, string> = {
  * Con fallback a jsPDF si no hay template
  */
 export async function generateDynamicPDF(params: DynamicPDFParams): Promise<PDFResult> {
-  const { templateType, employeeData, documentId, customData } = params;
+  const { templateType, employeeData, documentId, customData, tenantId } = params;
   const isPreview = documentId.startsWith('preview_');
   
-  console.log('📄 [DYNAMIC PDF] Iniciando generación:', templateType, isPreview ? '(PREVIEW)' : '(GUARDAR)');
+  console.log('📄 [DYNAMIC PDF] Iniciando generación:', templateType, isPreview ? '(PREVIEW)' : '(GUARDAR)', 'tenant:', tenantId || 'global');
 
   try {
     // 1. Verificar si existen las tablas de templates
     const tablesExist = await checkTemplatesTableExists();
     
     if (tablesExist) {
-      // 2. Intentar obtener template dinámico
+      // 2. Intentar obtener template dinámico (con soporte multi-tenant)
       const mappedType = TEMPLATE_TYPE_MAP[templateType] || templateType;
-      const template = await getTemplateByType(mappedType);
+      const template = await getTemplateByType(mappedType, tenantId);
       
       if (template && template.contenido_html) {
         console.log('✅ [DYNAMIC PDF] Template dinámico encontrado:', template.nombre);

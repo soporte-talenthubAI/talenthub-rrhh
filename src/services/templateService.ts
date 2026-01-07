@@ -33,6 +33,8 @@ export interface DocumentTemplate {
   pdf_fields: string[] | null;
   descripcion: string | null;
   instrucciones: string | null;
+  // Campo para multi-tenancy
+  tenant_id: string | null;
 }
 
 // Lista de módulos disponibles
@@ -110,45 +112,52 @@ export async function getTemplateTypes(): Promise<TemplateType[]> {
 
 /**
  * Obtiene un template específico por tipo
- * Prioriza: 1) Template personalizado activo, 2) Template default
+ * Prioriza: 1) Template del tenant, 2) Template default global
  */
-export async function getTemplateByType(templateTypeId: string): Promise<DocumentTemplate | null> {
-  console.log(`📄 [TEMPLATE SERVICE] Buscando template para tipo: ${templateTypeId}`);
+export async function getTemplateByType(
+  templateTypeId: string,
+  tenantId?: string
+): Promise<DocumentTemplate | null> {
+  console.log(`📄 [TEMPLATE SERVICE] Buscando template para tipo: ${templateTypeId}, tenant: ${tenantId || 'global'}`);
   
-  // 1. Primero buscar templates personalizados (NO default, pero activos)
-  const { data: customTemplates, error: customError } = await supabase
-    .from("document_templates")
-    .select("*")
-    .eq("template_type_id", templateTypeId)
-    .eq("is_active", true)
-    .eq("is_default", false)
-    .order("updated_at", { ascending: false })
-    .limit(1);
+  // 1. Si hay tenantId, buscar template específico del tenant
+  if (tenantId) {
+    const { data: tenantTemplate } = await supabase
+      .from("document_templates")
+      .select("*")
+      .eq("template_type_id", templateTypeId)
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1);
 
-  if (!customError && customTemplates && customTemplates.length > 0) {
-    console.log(`✅ [TEMPLATE SERVICE] Template personalizado encontrado: ${customTemplates[0].nombre}`);
-    return customTemplates[0];
+    if (tenantTemplate && tenantTemplate.length > 0) {
+      console.log(`✅ [TEMPLATE SERVICE] Template del tenant encontrado: ${tenantTemplate[0].nombre}`);
+      return tenantTemplate[0];
+    }
   }
 
-  // 2. Si no hay personalizado, buscar el default
-  const { data: defaultTemplate, error: defaultError } = await supabase
+  // 2. Buscar template default global (tenant_id IS NULL)
+  const { data: defaultTemplate } = await supabase
     .from("document_templates")
     .select("*")
     .eq("template_type_id", templateTypeId)
+    .is("tenant_id", null)
     .eq("is_active", true)
     .eq("is_default", true)
-    .single();
+    .limit(1);
 
-  if (!defaultError && defaultTemplate) {
-    console.log(`📋 [TEMPLATE SERVICE] Usando template default: ${defaultTemplate.nombre}`);
-    return defaultTemplate;
+  if (defaultTemplate && defaultTemplate.length > 0) {
+    console.log(`📋 [TEMPLATE SERVICE] Usando template default global: ${defaultTemplate[0].nombre}`);
+    return defaultTemplate[0];
   }
 
-  // 3. Último intento: cualquier template activo de ese tipo
+  // 3. Último intento: cualquier template activo de ese tipo sin tenant
   const { data: anyTemplate } = await supabase
     .from("document_templates")
     .select("*")
     .eq("template_type_id", templateTypeId)
+    .is("tenant_id", null)
     .eq("is_active", true)
     .order("created_at", { ascending: false })
     .limit(1);
@@ -164,13 +173,20 @@ export async function getTemplateByType(templateTypeId: string): Promise<Documen
 
 /**
  * Obtiene todos los templates activos
+ * Si se pasa tenantId, retorna templates del tenant + defaults globales
  */
-export async function getAllTemplates(): Promise<DocumentTemplate[]> {
-  const { data, error } = await supabase
+export async function getAllTemplates(tenantId?: string): Promise<DocumentTemplate[]> {
+  let query = supabase
     .from("document_templates")
     .select("*")
-    .eq("is_active", true)
-    .order("nombre");
+    .eq("is_active", true);
+  
+  if (tenantId) {
+    // Templates del tenant O templates default globales (tenant_id IS NULL AND is_default = true)
+    query = query.or(`tenant_id.eq.${tenantId},and(tenant_id.is.null,is_default.eq.true)`);
+  }
+  
+  const { data, error } = await query.order("nombre");
 
   if (error) {
     console.error("Error fetching templates:", error);
@@ -378,13 +394,23 @@ export async function checkTemplatesTableExists(): Promise<boolean> {
 
 /**
  * Obtiene templates por módulo
+ * Si se pasa tenantId, retorna templates del tenant + defaults globales para ese módulo
  */
-export async function getTemplatesByModule(moduleId: string): Promise<DocumentTemplate[]> {
-  const { data, error } = await supabase
+export async function getTemplatesByModule(
+  moduleId: string,
+  tenantId?: string
+): Promise<DocumentTemplate[]> {
+  let query = supabase
     .from("document_templates")
     .select("*")
     .eq("module_id", moduleId)
-    .eq("is_active", true)
+    .eq("is_active", true);
+  
+  if (tenantId) {
+    query = query.or(`tenant_id.eq.${tenantId},tenant_id.is.null`);
+  }
+  
+  const { data, error } = await query
     .order("is_default", { ascending: false })
     .order("nombre");
 
@@ -398,63 +424,84 @@ export async function getTemplatesByModule(moduleId: string): Promise<DocumentTe
 
 /**
  * Obtiene el mejor template para un módulo y tipo de documento
- * Prioridad: 1) Template personalizado del módulo, 2) Default del módulo, 3) Por tipo
+ * Prioridad: 1) Template del tenant para el módulo, 2) Default global del módulo, 3) Por tipo
  */
 export async function getTemplateForModule(
   moduleId: string, 
-  templateType?: string
+  templateType?: string,
+  tenantId?: string
 ): Promise<DocumentTemplate | null> {
-  console.log(`📄 [TEMPLATE SERVICE] Buscando template para módulo: ${moduleId}, tipo: ${templateType || 'cualquiera'}`);
+  console.log(`📄 [TEMPLATE SERVICE] Buscando template para módulo: ${moduleId}, tipo: ${templateType || 'cualquiera'}, tenant: ${tenantId || 'global'}`);
 
-  // 1. Si hay tipo específico, buscar por tipo y módulo
-  if (templateType) {
-    // Primero buscar personalizado del módulo
-    const { data: moduleCustom } = await supabase
+  // 1. Si hay tipo específico y tenantId, buscar template del tenant para ese módulo y tipo
+  if (templateType && tenantId) {
+    const { data: tenantModuleTemplate } = await supabase
       .from("document_templates")
       .select("*")
       .eq("module_id", moduleId)
       .eq("template_type_id", templateType)
+      .eq("tenant_id", tenantId)
       .eq("is_active", true)
-      .eq("is_default", false)
       .order("updated_at", { ascending: false })
       .limit(1);
 
-    if (moduleCustom && moduleCustom.length > 0) {
-      console.log(`✅ [TEMPLATE SERVICE] Template personalizado del módulo: ${moduleCustom[0].nombre}`);
-      return moduleCustom[0];
+    if (tenantModuleTemplate && tenantModuleTemplate.length > 0) {
+      console.log(`✅ [TEMPLATE SERVICE] Template del tenant para módulo: ${tenantModuleTemplate[0].nombre}`);
+      return tenantModuleTemplate[0];
     }
+  }
 
-    // Buscar default del módulo
+  // 2. Si hay tipo, buscar template default global para el módulo
+  if (templateType) {
     const { data: moduleDefault } = await supabase
       .from("document_templates")
       .select("*")
       .eq("module_id", moduleId)
       .eq("template_type_id", templateType)
+      .is("tenant_id", null)
       .eq("is_active", true)
       .eq("is_default", true)
       .limit(1);
 
     if (moduleDefault && moduleDefault.length > 0) {
-      console.log(`📋 [TEMPLATE SERVICE] Template default del módulo: ${moduleDefault[0].nombre}`);
+      console.log(`📋 [TEMPLATE SERVICE] Template default global del módulo: ${moduleDefault[0].nombre}`);
       return moduleDefault[0];
     }
 
-    // Fallback a getTemplateByType
-    return await getTemplateByType(templateType);
+    // Fallback a getTemplateByType con tenantId
+    return await getTemplateByType(templateType, tenantId);
   }
 
-  // 2. Si no hay tipo, buscar cualquier template del módulo (personalizado primero)
+  // 3. Si no hay tipo, buscar cualquier template del módulo (del tenant primero)
+  if (tenantId) {
+    const { data: tenantModuleAny } = await supabase
+      .from("document_templates")
+      .select("*")
+      .eq("module_id", moduleId)
+      .eq("tenant_id", tenantId)
+      .eq("is_active", true)
+      .order("updated_at", { ascending: false })
+      .limit(1);
+
+    if (tenantModuleAny && tenantModuleAny.length > 0) {
+      console.log(`📋 [TEMPLATE SERVICE] Template del tenant para módulo: ${tenantModuleAny[0].nombre}`);
+      return tenantModuleAny[0];
+    }
+  }
+
+  // 4. Fallback: default global del módulo
   const { data: anyModuleTemplate } = await supabase
     .from("document_templates")
     .select("*")
     .eq("module_id", moduleId)
+    .is("tenant_id", null)
     .eq("is_active", true)
-    .order("is_default", { ascending: true }) // Personalizados primero
+    .order("is_default", { ascending: false })
     .order("updated_at", { ascending: false })
     .limit(1);
 
   if (anyModuleTemplate && anyModuleTemplate.length > 0) {
-    console.log(`📋 [TEMPLATE SERVICE] Template del módulo: ${anyModuleTemplate[0].nombre}`);
+    console.log(`📋 [TEMPLATE SERVICE] Template default del módulo: ${anyModuleTemplate[0].nombre}`);
     return anyModuleTemplate[0];
   }
 

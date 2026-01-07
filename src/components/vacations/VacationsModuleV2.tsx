@@ -11,6 +11,7 @@ import VacationDetail from "./VacationDetail";
 import { useToast } from "@/hooks/use-toast";
 import { useEmployees } from "@/hooks/useEmployees";
 import { useVacations } from "@/hooks/useVacations";
+import { useTenant } from "@/contexts/TenantContext";
 import html2pdf from "html2pdf.js";
 import { clientConfig, getClientConfig } from "@/config/client";
 import { formatDateLocal } from "@/utils/dateUtils";
@@ -19,6 +20,7 @@ import { getTemplateForModule, replacePlaceholders } from "@/services/templateSe
 
 export const VacationsModule = () => {
   const { toast } = useToast();
+  const { tenant } = useTenant();
   const { employees, getActiveEmployees } = useEmployees();
   const { 
     vacationRequests, 
@@ -132,9 +134,9 @@ export const VacationsModule = () => {
       const safeName = empleadoNombre.replace(/\s+/g, "_");
       const fileName = `Notificacion_Vacaciones_${safeName}_${periodo}.pdf`;
 
-      // Intentar obtener template personalizado de la BD
+      // Intentar obtener template personalizado de la BD (con soporte multi-tenant)
       let htmlContent = "";
-      const template = await getTemplateForModule('vacations', 'certificado_vacaciones');
+      const template = await getTemplateForModule('vacations', 'certificado_vacaciones', tenant?.id);
       
       if (template && template.contenido_html) {
         console.log('✅ [VACACIONES] Usando template personalizado:', template.nombre);

@@ -34,6 +34,7 @@ interface TemplatePickerProps {
   customData?: Record<string, any>;
   onGenerate?: (result: { html?: string; pdfUrl?: string; template: DocumentTemplate }) => void;
   triggerButton?: React.ReactNode;
+  tenantId?: string;
 }
 
 export const TemplatePicker = ({ 
@@ -41,7 +42,8 @@ export const TemplatePicker = ({
   employee, 
   customData,
   onGenerate,
-  triggerButton 
+  triggerButton,
+  tenantId
 }: TemplatePickerProps) => {
   const { toast } = useToast();
   const [open, setOpen] = useState(false);
@@ -56,12 +58,12 @@ export const TemplatePicker = ({
     if (open && moduleId) {
       loadTemplates();
     }
-  }, [open, moduleId]);
+  }, [open, moduleId, tenantId]);
 
   const loadTemplates = async () => {
     setLoading(true);
     try {
-      const data = await getTemplatesByModule(moduleId);
+      const data = await getTemplatesByModule(moduleId, tenantId);
       setTemplates(data);
     } catch (error) {
       console.error("Error loading templates:", error);
