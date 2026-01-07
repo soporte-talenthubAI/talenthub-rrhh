@@ -74,12 +74,23 @@ const Backoffice = () => {
   // Obtener cliente seleccionado
   const selectedClient = clients.find(c => c.id === selectedClientId) || null;
 
-  // Check auth on mount
+  // Check auth on mount - verificar sesión de Supabase Auth
   useEffect(() => {
-    const auth = localStorage.getItem('backoffice_auth');
-    if (auth) {
-      setIsAuthenticated(true);
-    }
+    const checkAuth = async () => {
+      const auth = localStorage.getItem('backoffice_auth');
+      if (auth) {
+        // Verificar que también hay sesión activa en Supabase Auth
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          setIsAuthenticated(true);
+        } else {
+          // Si no hay sesión de Auth, limpiar localStorage
+          localStorage.removeItem('backoffice_auth');
+          setIsAuthenticated(false);
+        }
+      }
+    };
+    checkAuth();
   }, []);
 
   // Seleccionar primer cliente cuando se cargan
