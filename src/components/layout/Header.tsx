@@ -7,12 +7,21 @@ import {
   Building2
 } from "lucide-react";
 import { toast } from "@/hooks/use-toast";
-import { clientConfig } from "@/config/client";
+import { useTenant } from "@/contexts/TenantContext";
+import { getClientConfig } from "@/config/client";
+import { supabase } from "@/integrations/supabase/client";
 
 const Header = () => {
   const navigate = useNavigate();
+  const { tenant } = useTenant();
+  const clientConfig = getClientConfig();
+  
+  // Usar datos del tenant o fallback a clientConfig
+  const logoUrl = tenant?.logo_url || clientConfig.logoUrl;
+  const nombre = tenant?.nombre || clientConfig.nombre;
 
-  const handleLogout = () => {
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
     localStorage.removeItem('authenticated');
     toast({
       title: "Sesión cerrada",
@@ -26,10 +35,10 @@ const Header = () => {
       <div className="container flex h-16 items-center justify-between px-6">
         <div className="flex items-center space-x-4">
           <div className="flex items-center space-x-3">
-            {clientConfig.logoUrl ? (
+            {logoUrl ? (
               <img 
-                src={clientConfig.logoUrl} 
-                alt={clientConfig.nombre} 
+                src={logoUrl} 
+                alt={nombre} 
                 className="h-12 w-12 object-contain"
               />
             ) : (
@@ -39,7 +48,7 @@ const Header = () => {
             )}
             <div>
               <h1 className="text-xl font-bold text-foreground tracking-tight">
-                RRHH {clientConfig.nombre}
+                RRHH {nombre}
               </h1>
               <p className="text-sm text-muted-foreground">
                 Sistema de gestión de personal • TalentHub
