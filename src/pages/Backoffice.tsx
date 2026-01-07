@@ -66,7 +66,9 @@ const Backoffice = () => {
     telefono: '',
     plan: 'basic' as const,
     status: 'active' as const,
+    email_admin: '', // Email del administrador para invitar
   });
+  const [creatingClient, setCreatingClient] = useState(false);
   const [editClient, setEditClient] = useState<Partial<TalentHubClient>>({});
 
   // Obtener cliente seleccionado
@@ -162,8 +164,83 @@ const Backoffice = () => {
 
   // Create new client
   const handleCreateClient = async () => {
+    if (!newClient.nombre) {
+      toast({
+        title: "Error",
+        description: "El nombre del cliente es requerido",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    setCreatingClient(true);
     try {
-      const created = await createClient(newClient as any);
+      // 1. Crear el cliente
+      const created = await createClient({
+        nombre: newClient.nombre,
+        nombre_corto: newClient.nombre_corto,
+        email_contacto: newClient.email_contacto || newClient.email_admin,
+        telefono: newClient.telefono,
+        plan: newClient.plan,
+        status: newClient.status,
+      } as any);
+
+      if (!created?.id) {
+        throw new Error('Error al crear el cliente');
+      }
+
+      // 2. Si hay email de admin, enviar invitación
+      if (newClient.email_admin) {
+        const { data: session } = await supabase.auth.getSession();
+        
+        const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'invite_user',
+            email: newClient.email_admin,
+            tenantId: created.id,
+            role: 'admin',
+          }),
+        });
+
+        const result = await response.json();
+        
+        if (response.ok && result.user) {
+          // 3. Crear registro en tenant_users
+          await (supabase as any)
+            .from('tenant_users')
+            .insert({
+              user_id: result.user.id || null,
+              tenant_id: created.id,
+              email: newClient.email_admin,
+              role: 'admin',
+              is_active: true,
+              invited_at: new Date().toISOString(),
+            });
+
+          toast({
+            title: "Cliente creado",
+            description: `Se envió invitación a ${newClient.email_admin}`,
+          });
+        } else {
+          // Cliente creado pero falló la invitación
+          toast({
+            title: "Cliente creado",
+            description: `Advertencia: No se pudo enviar invitación - ${result.error || 'Error desconocido'}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Cliente creado",
+          description: "El cliente fue creado exitosamente",
+        });
+      }
+
       setShowNewClientDialog(false);
       setNewClient({
         nombre: '',
@@ -172,13 +249,20 @@ const Backoffice = () => {
         telefono: '',
         plan: 'basic',
         status: 'active',
+        email_admin: '',
       });
+      
       // Seleccionar el cliente recién creado
-      if (created?.id) {
-        setSelectedClientId(created.id);
-      }
-    } catch (error) {
-      // Error handled in hook
+      setSelectedClientId(created.id);
+    } catch (error: any) {
+      console.error('Error creating client:', error);
+      toast({
+        title: "Error",
+        description: error.message || "No se pudo crear el cliente",
+        variant: "destructive",
+      });
+    } finally {
+      setCreatingClient(false);
     }
   };
 
@@ -567,8 +651,26 @@ const Backoffice = () => {
                               </Select>
                             </div>
                           </div>
-                          <Button onClick={handleCreateClient} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                            Crear Cliente
+                          {/* Email del Administrador */}
+                          <div className="space-y-2 border-t border-slate-700 pt-4">
+                            <Label className="text-slate-300">Email del Administrador (opcional)</Label>
+                            <Input
+                              type="email"
+                              value={newClient.email_admin}
+                              onChange={(e) => setNewClient(prev => ({ ...prev, email_admin: e.target.value }))}
+                              placeholder="admin@empresa.com"
+                              className="bg-slate-700 border-slate-600 text-white"
+                            />
+                            <p className="text-xs text-slate-500">
+                              Se enviará una invitación por email para que el administrador establezca su contraseña
+                            </p>
+                          </div>
+                          <Button 
+                            onClick={handleCreateClient} 
+                            className="w-full bg-emerald-600 hover:bg-emerald-700"
+                            disabled={creatingClient}
+                          >
+                            {creatingClient ? 'Creando...' : 'Crear Cliente'}
                           </Button>
                         </div>
                       </DialogContent>

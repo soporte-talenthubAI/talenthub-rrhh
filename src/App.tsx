@@ -6,6 +6,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import Index from "./pages/Index";
 import Login from "./pages/Login";
+import SetPassword from "./pages/SetPassword";
 import NotFound from "./pages/NotFound";
 import Backoffice from "./pages/Backoffice";
 import { loadClientConfig } from "@/config/client";
@@ -44,6 +45,7 @@ const App = () => {
           <TenantProvider>
             <Routes>
               <Route path="/login" element={<Login />} />
+              <Route path="/set-password" element={<SetPassword />} />
               <Route path="/" element={<Index />} />
               <Route path="/backoffice" element={<Backoffice />} />
               {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}

@@ -3,9 +3,10 @@
  *
  * Permite:
  * - Ver usuarios asignados a un cliente
- * - Invitar nuevos usuarios
+ * - Invitar nuevos usuarios por email
  * - Cambiar roles de usuarios
  * - Desactivar usuarios
+ * - Reenviar invitaciones
  */
 
 import { useState, useEffect } from 'react';
@@ -17,6 +18,7 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 import {
   Users,
   UserPlus,
@@ -27,19 +29,23 @@ import {
   XCircle,
   Trash2,
   KeyRound,
+  Send,
+  AlertTriangle,
+  MailCheck,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
 interface TenantUser {
   id: string;
-  user_id: string;
+  user_id: string | null;
   tenant_id: string;
   email: string;
   role: 'admin' | 'rrhh' | 'viewer';
   is_active: boolean;
   invited_at: string;
   last_access: string | null;
+  email_verified?: boolean;
 }
 
 interface ClientUserManagerProps {
@@ -47,13 +53,24 @@ interface ClientUserManagerProps {
   clientName: string | null;
 }
 
+// Generar contraseña temporal
+const generateTempPassword = () => {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789';
+  let password = '';
+  for (let i = 0; i < 10; i++) {
+    password += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return password;
+};
+
 const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => {
   const { toast } = useToast();
   const [loading, setLoading] = useState(false);
   const [users, setUsers] = useState<TenantUser[]>([]);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showPasswordDialog, setShowPasswordDialog] = useState(false);
-  const [inviteData, setInviteData] = useState({ email: '', password: '', role: 'viewer' as const });
+  const [inviteData, setInviteData] = useState({ email: '', role: 'viewer' as const });
+  const [inviteLoading, setInviteLoading] = useState(false);
   const [passwordChangeData, setPasswordChangeData] = useState<{ userId: string; email: string; newPassword: string }>({ userId: '', email: '', newPassword: '' });
 
   // Si no hay cliente seleccionado
@@ -96,39 +113,31 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
     loadUsers();
   }, [clientId]);
 
-  // Crear usuario - usa Edge Function para crear en Auth (sin confirmación de email)
+  // Invitar usuario por email - requiere verificación
   const handleInviteUser = async () => {
-    if (!inviteData.email || !inviteData.password) {
+    if (!inviteData.email) {
       toast({
         title: 'Error',
-        description: 'Ingresa email y contraseña',
+        description: 'Ingresa un email válido',
         variant: 'destructive',
       });
       return;
     }
 
-    if (inviteData.password.length < 6) {
+    // Verificar si el usuario ya existe en este tenant
+    const existingUser = users.find(u => u.email === inviteData.email);
+    if (existingUser) {
       toast({
         title: 'Error',
-        description: 'La contraseña debe tener al menos 6 caracteres',
+        description: 'Este email ya está registrado para este cliente',
         variant: 'destructive',
       });
       return;
     }
 
+    setInviteLoading(true);
     try {
-      // Verificar si el usuario ya existe en este tenant
-      const existingUser = users.find(u => u.email === inviteData.email);
-      if (existingUser) {
-        toast({
-          title: 'Error',
-          description: 'Este email ya está registrado para este cliente',
-          variant: 'destructive',
-        });
-        return;
-      }
-
-      // 1. Crear usuario en Supabase Auth usando Edge Function (sin confirmación de email)
+      // 1. Llamar a Edge Function para invitar por email
       const { data: session } = await supabase.auth.getSession();
       
       const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
@@ -138,19 +147,20 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
           'Authorization': `Bearer ${session?.session?.access_token}`,
         },
         body: JSON.stringify({
-          action: 'create_user',
+          action: 'invite_user',
           email: inviteData.email,
-          password: inviteData.password,
+          tenantId: clientId,
+          role: inviteData.role,
         }),
       });
 
       const result = await response.json();
       
       if (!response.ok) {
-        throw new Error(result.error || 'Error al crear usuario');
+        throw new Error(result.error || 'Error al enviar invitación');
       }
 
-      // 2. Crear el registro en tenant_users
+      // 2. Crear el registro en tenant_users (user_id será null hasta que verifique)
       const { data, error } = await (supabase as any)
         .from('tenant_users')
         .insert({
@@ -160,6 +170,7 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
           role: inviteData.role,
           is_active: true,
           invited_at: new Date().toISOString(),
+          email_verified: false,
         })
         .select()
         .single();
@@ -168,17 +179,56 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
 
       setUsers(prev => [data, ...prev]);
       setShowInviteDialog(false);
-      setInviteData({ email: '', password: '', role: 'viewer' });
+      setInviteData({ email: '', role: 'viewer' });
 
       toast({
-        title: 'Usuario creado exitosamente',
-        description: `${inviteData.email} puede acceder inmediatamente con la contraseña definida`,
+        title: 'Invitación enviada',
+        description: `Se envió un email a ${inviteData.email} para que establezca su contraseña`,
       });
     } catch (error: any) {
-      console.error('Error creating user:', error);
+      console.error('Error inviting user:', error);
       toast({
         title: 'Error',
-        description: error.message || 'No se pudo crear el usuario',
+        description: error.message || 'No se pudo enviar la invitación',
+        variant: 'destructive',
+      });
+    } finally {
+      setInviteLoading(false);
+    }
+  };
+
+  // Reenviar invitación
+  const handleResendInvite = async (email: string) => {
+    try {
+      const { data: session } = await supabase.auth.getSession();
+      
+      const response = await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session?.session?.access_token}`,
+        },
+        body: JSON.stringify({
+          action: 'resend_invite',
+          email: email,
+        }),
+      });
+
+      const result = await response.json();
+      
+      if (!response.ok) {
+        throw new Error(result.error || 'Error al reenviar invitación');
+      }
+
+      toast({
+        title: 'Invitación reenviada',
+        description: `Se reenvió el email de invitación a ${email}`,
+      });
+    } catch (error: any) {
+      console.error('Error resending invite:', error);
+      toast({
+        title: 'Error',
+        description: error.message || 'No se pudo reenviar la invitación',
         variant: 'destructive',
       });
     }
@@ -298,10 +348,11 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
   };
 
   // Eliminar usuario
-  const handleDeleteUser = async (userId: string) => {
-    if (!confirm('¿Estás seguro de eliminar este usuario?')) return;
+  const handleDeleteUser = async (userId: string, authUserId: string | null) => {
+    if (!confirm('¿Estás seguro de eliminar este usuario? Esta acción no se puede deshacer.')) return;
 
     try {
+      // 1. Eliminar de tenant_users
       const { error } = await (supabase as any)
         .from('tenant_users')
         .delete()
@@ -309,11 +360,28 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
 
       if (error) throw error;
 
+      // 2. Si tiene user_id, también eliminar de Auth
+      if (authUserId) {
+        const { data: session } = await supabase.auth.getSession();
+        
+        await fetch(`${import.meta.env.VITE_SUPABASE_URL || 'https://lmxyphwydubacsekkyxi.supabase.co'}/functions/v1/admin-update-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${session?.session?.access_token}`,
+          },
+          body: JSON.stringify({
+            action: 'delete_user',
+            userId: authUserId,
+          }),
+        });
+      }
+
       setUsers(prev => prev.filter(u => u.id !== userId));
 
       toast({
         title: 'Usuario eliminado',
-        description: 'El usuario ha sido eliminado',
+        description: 'El usuario ha sido eliminado completamente',
       });
     } catch (error) {
       console.error('Error deleting user:', error);
@@ -336,6 +404,24 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
     return <Badge className={`${color} text-white`}>{label}</Badge>;
   };
 
+  // Badge de estado de verificación
+  const getVerificationBadge = (user: TenantUser) => {
+    if (user.user_id && user.last_access) {
+      return (
+        <Badge className="bg-green-500/20 text-green-400 border-green-500/50">
+          <MailCheck className="h-3 w-3 mr-1" />
+          Verificado
+        </Badge>
+      );
+    }
+    return (
+      <Badge className="bg-yellow-500/20 text-yellow-400 border-yellow-500/50">
+        <Clock className="h-3 w-3 mr-1" />
+        Pendiente
+      </Badge>
+    );
+  };
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -356,7 +442,7 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
               className="bg-emerald-600 hover:bg-emerald-700"
             >
               <UserPlus className="h-4 w-4 mr-2" />
-              Agregar Usuario
+              Invitar Usuario
             </Button>
           </div>
         </CardHeader>
@@ -369,7 +455,7 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
             <div className="text-center py-8 text-slate-400">
               <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
               <p>No hay usuarios registrados para este cliente</p>
-              <p className="text-sm mt-2">Haz clic en "Agregar Usuario" para invitar al primer usuario</p>
+              <p className="text-sm mt-2">Haz clic en "Invitar Usuario" para enviar la primera invitación</p>
             </div>
           ) : (
             <Table>
@@ -377,6 +463,7 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                 <TableRow className="border-slate-700">
                   <TableHead className="text-slate-300">Email</TableHead>
                   <TableHead className="text-slate-300">Rol</TableHead>
+                  <TableHead className="text-slate-300">Verificación</TableHead>
                   <TableHead className="text-slate-300">Estado</TableHead>
                   <TableHead className="text-slate-300">Último Acceso</TableHead>
                   <TableHead className="text-slate-300">Acciones</TableHead>
@@ -407,6 +494,9 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                       </Select>
                     </TableCell>
                     <TableCell>
+                      {getVerificationBadge(user)}
+                    </TableCell>
+                    <TableCell>
                       <Badge
                         className={user.is_active ? 'bg-green-500' : 'bg-red-500'}
                         onClick={() => handleToggleActive(user.id, user.is_active)}
@@ -431,19 +521,34 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                     </TableCell>
                     <TableCell>
                       <div className="flex gap-1">
+                        {/* Reenviar invitación solo si no ha verificado */}
+                        {!user.last_access && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleResendInvite(user.email)}
+                            className="text-blue-400 hover:text-blue-300"
+                            title="Reenviar invitación"
+                          >
+                            <Send className="h-4 w-4" />
+                          </Button>
+                        )}
+                        {/* Resetear contraseña solo si ya verificó */}
+                        {user.user_id && user.last_access && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => handleResetPassword(user.user_id!, user.email)}
+                            className="text-yellow-400 hover:text-yellow-300"
+                            title="Restablecer contraseña"
+                          >
+                            <KeyRound className="h-4 w-4" />
+                          </Button>
+                        )}
                         <Button
                           variant="ghost"
                           size="sm"
-                          onClick={() => handleResetPassword(user.id, user.email)}
-                          className="text-yellow-400 hover:text-yellow-300"
-                          title="Restablecer contraseña"
-                        >
-                          <KeyRound className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => handleDeleteUser(user.id)}
+                          onClick={() => handleDeleteUser(user.id, user.user_id)}
                           className="text-red-400 hover:text-red-300"
                           title="Eliminar usuario"
                         >
@@ -459,16 +564,30 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
         </CardContent>
       </Card>
 
-      {/* Crear Usuario Dialog */}
+      {/* Invitar Usuario Dialog */}
       <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
         <DialogContent className="bg-slate-800 border-slate-700">
           <DialogHeader>
-            <DialogTitle className="text-white">Crear Usuario</DialogTitle>
+            <DialogTitle className="text-white">Invitar Usuario</DialogTitle>
             <DialogDescription className="text-slate-400">
-              Crear un nuevo usuario para {clientName}
+              Invitar un nuevo usuario a {clientName}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-4">
+            <Alert className="bg-blue-500/10 border-blue-500/50">
+              <Mail className="h-4 w-4 text-blue-400" />
+              <AlertDescription className="text-blue-300">
+                Se enviará un email de invitación. El usuario deberá hacer clic en el link para establecer su contraseña.
+              </AlertDescription>
+            </Alert>
+            
+            <Alert className="bg-yellow-500/10 border-yellow-500/50">
+              <AlertTriangle className="h-4 w-4 text-yellow-400" />
+              <AlertDescription className="text-yellow-300">
+                Plan gratuito: máximo 4 emails por hora
+              </AlertDescription>
+            </Alert>
+
             <div className="space-y-2">
               <Label className="text-slate-300">Email</Label>
               <Input
@@ -476,16 +595,6 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                 value={inviteData.email}
                 onChange={(e) => setInviteData(prev => ({ ...prev, email: e.target.value }))}
                 placeholder="usuario@ejemplo.com"
-                className="bg-slate-700 border-slate-600 text-white"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label className="text-slate-300">Contraseña</Label>
-              <Input
-                type="password"
-                value={inviteData.password}
-                onChange={(e) => setInviteData(prev => ({ ...prev, password: e.target.value }))}
-                placeholder="Mínimo 6 caracteres"
                 className="bg-slate-700 border-slate-600 text-white"
               />
             </div>
@@ -510,14 +619,23 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
                 variant="outline"
                 onClick={() => setShowInviteDialog(false)}
                 className="flex-1 border-slate-600 text-slate-300"
+                disabled={inviteLoading}
               >
                 Cancelar
               </Button>
               <Button
                 onClick={handleInviteUser}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700"
+                disabled={inviteLoading}
               >
-                Crear Usuario
+                {inviteLoading ? (
+                  <>Enviando...</>
+                ) : (
+                  <>
+                    <Send className="h-4 w-4 mr-2" />
+                    Enviar Invitación
+                  </>
+                )}
               </Button>
             </div>
           </div>
@@ -537,12 +655,15 @@ const ClientUserManager = ({ clientId, clientName }: ClientUserManagerProps) => 
             <div className="space-y-2">
               <Label className="text-slate-300">Nueva Contraseña</Label>
               <Input
-                type="password"
+                type="text"
                 value={passwordChangeData.newPassword}
                 onChange={(e) => setPasswordChangeData(prev => ({ ...prev, newPassword: e.target.value }))}
                 placeholder="Mínimo 6 caracteres"
-                className="bg-slate-700 border-slate-600 text-white"
+                className="bg-slate-700 border-slate-600 text-white font-mono"
               />
+              <p className="text-xs text-slate-500">
+                Comparte esta contraseña con el usuario de forma segura
+              </p>
             </div>
             <div className="flex gap-3 pt-4">
               <Button

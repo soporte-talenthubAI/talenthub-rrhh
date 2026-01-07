@@ -47,6 +47,18 @@ const Login = () => {
       }
 
       if (data.user) {
+        // Verificar si el email está confirmado
+        if (!data.user.email_confirmed_at) {
+          await supabase.auth.signOut();
+          toast({
+            title: "Email no verificado",
+            description: "Revisa tu correo para verificar tu cuenta antes de ingresar.",
+            variant: "destructive",
+          });
+          setIsLoading(false);
+          return;
+        }
+
         // Verificar si el usuario está activo
         const { data: profile } = await supabase
           .from('user_profiles')

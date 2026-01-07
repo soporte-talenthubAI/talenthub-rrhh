@@ -1,4 +1,4 @@
-// Edge Function para que el admin pueda actualizar usuarios
+// Edge Function para que el admin pueda gestionar usuarios
 // Requiere la clave de servicio de Supabase
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
@@ -52,7 +52,7 @@ serve(async (req) => {
       throw new Error('No autorizado - Solo administradores de TalentHub')
     }
 
-    const { action, userId, email, password } = await req.json()
+    const { action, userId, email, password, tenantId, role } = await req.json()
 
     let result
 
@@ -85,7 +85,7 @@ serve(async (req) => {
         break
 
       case 'create_user':
-        // Crear usuario sin confirmación de email
+        // Crear usuario sin confirmación de email (acceso inmediato)
         const { data: createData, error: createError } = await supabaseAdmin.auth.admin.createUser({
           email,
           password,
@@ -93,6 +93,57 @@ serve(async (req) => {
         })
         if (createError) throw createError
         result = { success: true, user: createData.user, message: 'Usuario creado' }
+        break
+
+      case 'invite_user':
+        // Invitar usuario por email - requiere verificación
+        // El usuario recibirá un email con link para establecer contraseña
+        const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
+        
+        const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+          email,
+          {
+            redirectTo: `${siteUrl}/set-password`,
+            data: {
+              tenant_id: tenantId || null,
+              role: role || 'viewer',
+              invited_by: user.email,
+            }
+          }
+        )
+        
+        if (inviteError) {
+          // Manejar error de rate limit
+          if (inviteError.message?.includes('rate limit') || inviteError.message?.includes('Email rate limit')) {
+            throw new Error('Límite de emails alcanzado. El plan gratuito permite 4 emails por hora. Intenta más tarde.')
+          }
+          throw inviteError
+        }
+        
+        result = { 
+          success: true, 
+          user: inviteData.user, 
+          message: 'Invitación enviada por email' 
+        }
+        break
+
+      case 'resend_invite':
+        // Reenviar invitación
+        const { data: resendData, error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
+          email,
+          {
+            redirectTo: `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/set-password`,
+          }
+        )
+        
+        if (resendError) {
+          if (resendError.message?.includes('rate limit') || resendError.message?.includes('Email rate limit')) {
+            throw new Error('Límite de emails alcanzado. Intenta en 1 hora.')
+          }
+          throw resendError
+        }
+        
+        result = { success: true, message: 'Invitación reenviada' }
         break
 
       default:
@@ -105,6 +156,7 @@ serve(async (req) => {
     )
 
   } catch (error) {
+    console.error('Error in admin-update-user:', error.message)
     return new Response(
       JSON.stringify({ error: error.message }),
       { 
@@ -114,4 +166,3 @@ serve(async (req) => {
     )
   }
 })
-
