@@ -11,6 +11,7 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { loadClientConfig, resetClientConfig, applyClientTheme } from '@/config/client';
 
 // =====================================================
 // TIPOS SIMPLIFICADOS
@@ -94,6 +95,9 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
 
       // Guardar tenant seleccionado
       localStorage.setItem(TENANT_STORAGE_KEY, tenantId);
+
+      // Cargar configuración del cliente (branding, colores, etc.)
+      await loadClientConfig(tenantId);
 
     } catch (err) {
       console.error('Error loading tenant data:', err);
@@ -183,6 +187,8 @@ export const TenantProvider: React.FC<TenantProviderProps> = ({ children }) => {
           setTenant(null);
           setEnabledModules([]);
           localStorage.removeItem(TENANT_STORAGE_KEY);
+          // Resetear config del cliente para que la próxima carga use los nuevos datos
+          resetClientConfig();
         }
       }
     );

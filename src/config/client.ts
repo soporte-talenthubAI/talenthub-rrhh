@@ -80,18 +80,27 @@ let _configLoaded = false;
 /**
  * Carga la configuración desde Supabase
  * Se llama una vez al iniciar la app (en App.tsx)
+ * 
+ * @param tenantId - Opcional. Si se proporciona, carga la config de ese tenant específico
  */
-export async function loadClientConfig(): Promise<ClientConfig> {
-  if (_configLoaded) {
+export async function loadClientConfig(tenantId?: string): Promise<ClientConfig> {
+  // Si no hay tenantId, usar config genérica de TalentHub
+  if (!tenantId) {
+    if (!_configLoaded) {
+      _clientConfig = { ...DEFAULT_CONFIG };
+      _configLoaded = true;
+      applyClientTheme();
+      console.log('✅ [CLIENT CONFIG] Usando config genérica de TalentHub');
+    }
     return _clientConfig;
   }
 
   try {
-    // Intentar cargar desde Supabase
+    // Cargar config específica del tenant desde client_config
     const { data, error } = await supabase
       .from('client_config')
       .select('*')
-      .limit(1)
+      .eq('tenant_id', tenantId)
       .single();
 
     if (!error && data) {
@@ -118,15 +127,38 @@ export async function loadClientConfig(): Promise<ClientConfig> {
         isConfigured: data.is_configured || false,
       };
       
-      console.log('✅ [CLIENT CONFIG] Cargado desde Supabase:', _clientConfig.nombre);
+      console.log('✅ [CLIENT CONFIG] Cargado para tenant:', _clientConfig.nombre);
     } else {
-      // Fallback a variables de entorno
-      console.log('⚠️ [CLIENT CONFIG] Tabla no existe, usando variables de entorno');
-      _clientConfig = loadFromEnvVars();
+      // Si no hay config específica, intentar cargar desde talenthub_clients
+      const { data: clientData } = await (supabase as any)
+        .from('talenthub_clients')
+        .select('*')
+        .eq('id', tenantId)
+        .single();
+
+      if (clientData) {
+        _clientConfig = {
+          ...DEFAULT_CONFIG,
+          nombre: clientData.nombre || DEFAULT_CONFIG.nombre,
+          nombreCorto: clientData.nombre_corto || DEFAULT_CONFIG.nombreCorto,
+          logoUrl: clientData.logo_url || DEFAULT_CONFIG.logoUrl,
+          colorPrimario: clientData.color_primario || DEFAULT_CONFIG.colorPrimario,
+          colorSecundario: clientData.color_secundario || DEFAULT_CONFIG.colorSecundario,
+          email: clientData.email_contacto || DEFAULT_CONFIG.email,
+          telefono: clientData.telefono || DEFAULT_CONFIG.telefono,
+          cuit: clientData.cuit || DEFAULT_CONFIG.cuit,
+          direccion: clientData.direccion || DEFAULT_CONFIG.direccion,
+          isConfigured: true,
+        };
+        console.log('✅ [CLIENT CONFIG] Cargado desde talenthub_clients:', _clientConfig.nombre);
+      } else {
+        console.log('⚠️ [CLIENT CONFIG] Tenant no encontrado, usando defaults');
+        _clientConfig = { ...DEFAULT_CONFIG };
+      }
     }
   } catch (error) {
-    console.warn('⚠️ [CLIENT CONFIG] Error cargando config, usando defaults:', error);
-    _clientConfig = loadFromEnvVars();
+    console.warn('⚠️ [CLIENT CONFIG] Error cargando config:', error);
+    _clientConfig = { ...DEFAULT_CONFIG };
   }
 
   _configLoaded = true;
@@ -135,6 +167,14 @@ export async function loadClientConfig(): Promise<ClientConfig> {
   applyClientTheme();
   
   return _clientConfig;
+}
+
+/**
+ * Resetea la config para permitir recargar con otro tenant
+ */
+export function resetClientConfig(): void {
+  _clientConfig = { ...DEFAULT_CONFIG };
+  _configLoaded = false;
 }
 
 /**
