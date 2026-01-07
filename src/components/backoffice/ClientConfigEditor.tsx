@@ -26,6 +26,7 @@ import {
   getClientConfig, 
   updateClientConfig, 
   uploadClientLogo,
+  loadClientConfigForTenant,
   ClientConfig 
 } from "@/config/client";
 
@@ -50,22 +51,45 @@ const ALL_MODULES = [
 interface ClientConfigEditorProps {
   onSave?: () => void;
   showTitle?: boolean;
+  tenantId?: string | null;
 }
 
-export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEditorProps) => {
+export const ClientConfigEditor = ({ onSave, showTitle = true, tenantId }: ClientConfigEditorProps) => {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [saving, setSaving] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [config, setConfig] = useState<ClientConfig>(getClientConfig());
   const [hasChanges, setHasChanges] = useState(false);
+  const [loadingConfig, setLoadingConfig] = useState(true);
+  const [originalConfig, setOriginalConfig] = useState<ClientConfig | null>(null);
 
-  // Detectar cambios
+  // Cargar configuración del tenant cuando cambie
   useEffect(() => {
-    const current = getClientConfig();
-    const changed = JSON.stringify(config) !== JSON.stringify(current);
-    setHasChanges(changed);
-  }, [config]);
+    const loadConfig = async () => {
+      setLoadingConfig(true);
+      setHasChanges(false);
+      if (tenantId) {
+        const loaded = await loadClientConfigForTenant(tenantId);
+        setConfig(loaded);
+        setOriginalConfig(loaded);
+      } else {
+        const defaultConfig = getClientConfig();
+        setConfig(defaultConfig);
+        setOriginalConfig(defaultConfig);
+      }
+      setLoadingConfig(false);
+    };
+    loadConfig();
+  }, [tenantId]);
+
+  // Detectar cambios comparando con config original
+  useEffect(() => {
+    if (!loadingConfig && originalConfig) {
+      const changed = JSON.stringify(config) !== JSON.stringify(originalConfig);
+      setHasChanges(changed);
+    }
+  }, [config, originalConfig, loadingConfig]);
 
   // Actualizar campo
   const handleChange = (field: keyof ClientConfig, value: string) => {
@@ -76,13 +100,14 @@ export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEdi
   const handleSave = async () => {
     setSaving(true);
     try {
-      const success = await updateClientConfig(config);
+      const success = await updateClientConfig(config, tenantId || undefined);
       
       if (success) {
         toast({
           title: "Configuración guardada",
           description: "Los cambios se aplicarán inmediatamente",
         });
+        setOriginalConfig(config);
         setHasChanges(false);
         onSave?.();
       } else {
@@ -126,7 +151,7 @@ export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEdi
 
     setUploading(true);
     try {
-      const logoUrl = await uploadClientLogo(file);
+      const logoUrl = await uploadClientLogo(file, tenantId || undefined);
       
       if (logoUrl) {
         setConfig(prev => ({ ...prev, logoUrl }));
@@ -147,6 +172,29 @@ export const ClientConfigEditor = ({ onSave, showTitle = true }: ClientConfigEdi
       setUploading(false);
     }
   };
+
+  // Mostrar mensaje si no hay tenant seleccionado
+  if (!tenantId) {
+    return (
+      <Card className="bg-slate-800 border-slate-700">
+        <CardContent className="p-8 text-center">
+          <Palette className="h-12 w-12 text-slate-500 mx-auto mb-4" />
+          <h3 className="text-lg font-medium text-white mb-2">Selecciona un Cliente</h3>
+          <p className="text-slate-400">
+            Selecciona un cliente del menú superior para gestionar su configuración de branding.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loadingConfig) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <p className="text-slate-400">Cargando configuración...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface Absence {
   id: string;
@@ -23,15 +24,23 @@ export const useAbsences = () => {
   const [absences, setAbsences] = useState<Absence[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchAbsences = async () => {
+    if (!tenant?.id) {
+      setAbsences([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await (supabase as any)
         .from('absences')
         .select(`
           *,
-          employees:employees (* )
+          employees:employees!inner (*, tenant_id)
         `)
+        .eq('employees.tenant_id', tenant.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -82,6 +91,7 @@ export const useAbsences = () => {
         certificado_medico: !!absenceData.certificado_medico,
         archivo_url: absenceData.archivo_url ?? null,
         observaciones: absenceData.observaciones ?? null,
+        tenant_id: tenant?.id,
       };
 
       const { data, error } = await (supabase as any)
@@ -185,7 +195,9 @@ export const useAbsences = () => {
   };
 
   useEffect(() => {
-    fetchAbsences();
+    if (tenant?.id) {
+      fetchAbsences();
+    }
 
     // Realtime updates
     const channel = (supabase as any)
@@ -193,14 +205,16 @@ export const useAbsences = () => {
       .on(
         'postgres_changes',
         { event: '*', schema: 'public', table: 'absences' },
-        () => fetchAbsences()
+        () => {
+          if (tenant?.id) fetchAbsences();
+        }
       )
       .subscribe();
 
     return () => {
       (supabase as any).removeChannel(channel);
     };
-  }, []);
+  }, [tenant?.id]);
 
   return {
     absences,

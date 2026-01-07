@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface SanctionStats {
   totalSanctions: number;
@@ -16,16 +17,29 @@ export const useSanctionStats = () => {
     thisMonthSanctions: 0
   });
   const [loading, setLoading] = useState(true);
+  const { tenant } = useTenant();
 
   const fetchSanctionStats = async () => {
+    if (!tenant?.id) {
+      setStats({
+        totalSanctions: 0,
+        suspensions: 0,
+        warnings: 0,
+        thisMonthSanctions: 0
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
       
-      // Get all sanctions - handle case where table might not exist
+      // Get all sanctions filtered by tenant
       const { data: sanctionsData, error } = await supabase
         .from('sanctions')
-        .select('tipo, fecha_documento, created_at');
+        .select('tipo, fecha_documento, created_at')
+        .eq('tenant_id', tenant.id);
 
       if (error) {
         // Sanctions table not found or error
@@ -79,8 +93,10 @@ export const useSanctionStats = () => {
   };
 
   useEffect(() => {
-    fetchSanctionStats();
-  }, []);
+    if (tenant?.id) {
+      fetchSanctionStats();
+    }
+  }, [tenant?.id]);
 
   return {
     stats,

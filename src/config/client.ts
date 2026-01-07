@@ -223,9 +223,78 @@ export const clientConfig = new Proxy({} as ClientConfig, {
 });
 
 /**
- * Actualiza la configuración en Supabase
+ * Carga la configuración de un tenant específico (para uso en Backoffice)
+ * NO modifica la config global en memoria
  */
-export async function updateClientConfig(updates: Partial<ClientConfig>): Promise<boolean> {
+export async function loadClientConfigForTenant(tenantId: string): Promise<ClientConfig> {
+  try {
+    const { data, error } = await supabase
+      .from('client_config')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .single();
+
+    if (!error && data) {
+      return {
+        nombre: data.nombre || DEFAULT_CONFIG.nombre,
+        nombreCorto: data.nombre_corto || DEFAULT_CONFIG.nombreCorto,
+        logoUrl: data.logo_url || DEFAULT_CONFIG.logoUrl,
+        faviconUrl: data.favicon_url || DEFAULT_CONFIG.faviconUrl,
+        colorPrimario: data.color_primario || DEFAULT_CONFIG.colorPrimario,
+        colorSecundario: data.color_secundario || DEFAULT_CONFIG.colorSecundario,
+        colorFondo: data.color_fondo || DEFAULT_CONFIG.colorFondo,
+        direccion: data.direccion || DEFAULT_CONFIG.direccion,
+        telefono: data.telefono || DEFAULT_CONFIG.telefono,
+        email: data.email || DEFAULT_CONFIG.email,
+        cuit: data.cuit || DEFAULT_CONFIG.cuit,
+        appTitle: data.app_title || DEFAULT_CONFIG.appTitle,
+        timezone: data.timezone || DEFAULT_CONFIG.timezone,
+        fechaFormato: data.fecha_formato || DEFAULT_CONFIG.fechaFormato,
+        moneda: data.moneda || DEFAULT_CONFIG.moneda,
+        modulosHabilitados: data.modulos_habilitados || DEFAULT_CONFIG.modulosHabilitados,
+        firmaEmpresaNombre: data.firma_empresa_nombre || DEFAULT_CONFIG.firmaEmpresaNombre,
+        firmaEmpresaCargo: data.firma_empresa_cargo || DEFAULT_CONFIG.firmaEmpresaCargo,
+        piePaginaDocumentos: data.pie_pagina_documentos || DEFAULT_CONFIG.piePaginaDocumentos,
+        isConfigured: data.is_configured || false,
+      };
+    }
+
+    // Si no existe config para este tenant, intentar desde talenthub_clients
+    const { data: clientData } = await (supabase as any)
+      .from('talenthub_clients')
+      .select('*')
+      .eq('id', tenantId)
+      .single();
+
+    if (clientData) {
+      return {
+        ...DEFAULT_CONFIG,
+        nombre: clientData.nombre || DEFAULT_CONFIG.nombre,
+        nombreCorto: clientData.nombre_corto || DEFAULT_CONFIG.nombreCorto,
+        logoUrl: clientData.logo_url || DEFAULT_CONFIG.logoUrl,
+        colorPrimario: clientData.color_primario || DEFAULT_CONFIG.colorPrimario,
+        colorSecundario: clientData.color_secundario || DEFAULT_CONFIG.colorSecundario,
+        email: clientData.email_contacto || DEFAULT_CONFIG.email,
+        telefono: clientData.telefono || DEFAULT_CONFIG.telefono,
+        cuit: clientData.cuit || DEFAULT_CONFIG.cuit,
+        direccion: clientData.direccion || DEFAULT_CONFIG.direccion,
+        isConfigured: false,
+      };
+    }
+
+    return { ...DEFAULT_CONFIG };
+  } catch (error) {
+    console.warn('Error loading tenant config:', error);
+    return { ...DEFAULT_CONFIG };
+  }
+}
+
+/**
+ * Actualiza la configuración en Supabase
+ * @param updates - Cambios parciales a aplicar
+ * @param tenantId - Si se proporciona, actualiza la config de ese tenant específico
+ */
+export async function updateClientConfig(updates: Partial<ClientConfig>, tenantId?: string): Promise<boolean> {
   try {
     // Mapear a nombres de columnas de BD
     const dbUpdates: Record<string, any> = {};
@@ -248,18 +317,48 @@ export async function updateClientConfig(updates: Partial<ClientConfig>): Promis
     if (updates.piePaginaDocumentos !== undefined) dbUpdates.pie_pagina_documentos = updates.piePaginaDocumentos;
     if (updates.isConfigured !== undefined) dbUpdates.is_configured = updates.isConfigured;
 
-    const { error } = await supabase
-      .from('client_config')
-      .update(dbUpdates)
-      .eq('id', (await supabase.from('client_config').select('id').single()).data?.id);
+    if (tenantId) {
+      // Actualizar config específica del tenant
+      // Primero verificar si existe
+      const { data: existing } = await supabase
+        .from('client_config')
+        .select('id')
+        .eq('tenant_id', tenantId)
+        .single();
 
-    if (error) throw error;
+      if (existing) {
+        // Actualizar existente
+        const { error } = await supabase
+          .from('client_config')
+          .update(dbUpdates)
+          .eq('tenant_id', tenantId);
+        
+        if (error) throw error;
+      } else {
+        // Crear nuevo registro para este tenant
+        const { error } = await supabase
+          .from('client_config')
+          .insert({
+            tenant_id: tenantId,
+            ...dbUpdates,
+            is_configured: true,
+          });
+        
+        if (error) throw error;
+      }
+    } else {
+      // Comportamiento original para config global
+      const { error } = await supabase
+        .from('client_config')
+        .update(dbUpdates)
+        .eq('id', (await supabase.from('client_config').select('id').single()).data?.id);
 
-    // Actualizar config en memoria
-    _clientConfig = { ..._clientConfig, ...updates };
-    
-    // Re-aplicar tema
-    applyClientTheme();
+      if (error) throw error;
+      
+      // Solo actualizar memoria si es config global
+      _clientConfig = { ..._clientConfig, ...updates };
+      applyClientTheme();
+    }
 
     return true;
   } catch (error) {
@@ -270,11 +369,16 @@ export async function updateClientConfig(updates: Partial<ClientConfig>): Promis
 
 /**
  * Sube el logo al bucket y actualiza la config
+ * @param file - Archivo de imagen a subir
+ * @param tenantId - Si se proporciona, organiza el archivo por tenant
  */
-export async function uploadClientLogo(file: File): Promise<string | null> {
+export async function uploadClientLogo(file: File, tenantId?: string): Promise<string | null> {
   try {
     const fileExt = file.name.split('.').pop();
-    const fileName = `logo-${Date.now()}.${fileExt}`;
+    // Incluir tenantId en el nombre del archivo para evitar colisiones
+    const fileName = tenantId 
+      ? `${tenantId}/logo-${Date.now()}.${fileExt}`
+      : `logo-${Date.now()}.${fileExt}`;
     
     const { error: uploadError } = await supabase.storage
       .from('client-assets')
@@ -291,8 +395,8 @@ export async function uploadClientLogo(file: File): Promise<string | null> {
 
     const logoUrl = urlData.publicUrl;
 
-    // Actualizar config
-    await updateClientConfig({ logoUrl });
+    // Actualizar config con tenantId si se proporciona
+    await updateClientConfig({ logoUrl }, tenantId);
 
     return logoUrl;
   } catch (error) {

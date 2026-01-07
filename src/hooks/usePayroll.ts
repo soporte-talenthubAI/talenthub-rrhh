@@ -1,6 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface PayrollRecord {
   id: string;
@@ -20,13 +21,17 @@ export interface PayrollRecord {
 
 export const usePayroll = () => {
   const queryClient = useQueryClient();
+  const { tenant } = useTenant();
 
   const { data: payrollRecords = [], isLoading } = useQuery({
-    queryKey: ["payroll"],
+    queryKey: ["payroll", tenant?.id],
     queryFn: async () => {
+      if (!tenant?.id) return [];
+      
       const { data, error } = await supabase
         .from("payroll")
         .select("*")
+        .eq("tenant_id", tenant.id)
         .order("payment_date", { ascending: false });
 
       if (error) throw error;
@@ -36,6 +41,7 @@ export const usePayroll = () => {
         status: record.status || "paid",
       })) as PayrollRecord[];
     },
+    enabled: !!tenant?.id,
   });
 
   const createPayroll = useMutation({
@@ -44,6 +50,7 @@ export const usePayroll = () => {
       const dataToInsert: any = {
         ...payrollData,
         status: payrollData.status || "paid",
+        tenant_id: tenant?.id,
       };
 
       const { data, error } = await supabase
@@ -225,6 +232,7 @@ export const usePayroll = () => {
         reversal_of_id: id,
         cancelled_at: new Date().toISOString(),
         cancellation_reason: reason || null,
+        tenant_id: tenant?.id,
       };
 
       const { data: newRecord, error: insertError } = await supabase

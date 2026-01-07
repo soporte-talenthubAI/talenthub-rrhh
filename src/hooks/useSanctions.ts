@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface Sanction {
   id: string;
@@ -24,13 +25,21 @@ export const useSanctions = () => {
   const [sanctions, setSanctions] = useState<Sanction[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchSanctions = async () => {
+    if (!tenant?.id) {
+      setSanctions([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('sanctions')
         .select('*')
+        .eq('tenant_id', tenant.id)
         .order('fecha_documento', { ascending: false });
 
       if (error) throw error;
@@ -47,14 +56,16 @@ export const useSanctions = () => {
   };
 
   useEffect(() => {
-    fetchSanctions();
-  }, []);
+    if (tenant?.id) {
+      fetchSanctions();
+    }
+  }, [tenant?.id]);
 
   const addSanction = async (sanctionData: Omit<Sanction, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       const { data, error } = await supabase
         .from('sanctions')
-        .insert(sanctionData)
+        .insert({ ...sanctionData, tenant_id: tenant?.id })
         .select()
         .single();
 

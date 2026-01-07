@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface AttendanceStats {
   lateArrivals: number;
@@ -16,8 +17,20 @@ export const useAttendance = () => {
     averageArrivalTime: '00:00'
   });
   const [loading, setLoading] = useState(true);
+  const { tenant } = useTenant();
 
   const fetchAttendanceStats = async () => {
+    if (!tenant?.id) {
+      setStats({
+        lateArrivals: 0,
+        onTimeArrivals: 0,
+        totalRecords: 0,
+        averageArrivalTime: '00:00'
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const currentMonth = new Date().getMonth() + 1;
       const currentYear = new Date().getFullYear();
@@ -26,10 +39,11 @@ export const useAttendance = () => {
       const nextMonth = currentMonth === 12 ? 1 : currentMonth + 1;
       const nextYear = currentMonth === 12 ? currentYear + 1 : currentYear;
       
-      // Get attendance records for current month
+      // Get attendance records for current month filtered by tenant
       const { data: attendanceData, error } = await supabase
         .from('attendance')
         .select('*')
+        .eq('tenant_id', tenant.id)
         .gte('fecha', `${currentYear}-${String(currentMonth).padStart(2, '0')}-01`)
         .lt('fecha', `${nextYear}-${String(nextMonth).padStart(2, '0')}-01`);
 
@@ -74,7 +88,9 @@ export const useAttendance = () => {
   };
 
   useEffect(() => {
-    fetchAttendanceStats();
+    if (tenant?.id) {
+      fetchAttendanceStats();
+    }
     
     // Set up real-time subscription
     const channel = supabase
@@ -87,7 +103,7 @@ export const useAttendance = () => {
           table: 'attendance'
         },
         () => {
-          fetchAttendanceStats();
+          if (tenant?.id) fetchAttendanceStats();
         }
       )
       .subscribe();
@@ -95,7 +111,7 @@ export const useAttendance = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [tenant?.id]);
 
   return {
     stats,

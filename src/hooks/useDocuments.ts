@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface Document {
   id: string;
@@ -23,20 +24,29 @@ export const useDocuments = () => {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchDocuments = async () => {
+    if (!tenant?.id) {
+      setDocuments([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       setLoading(true);
       const { data, error } = await supabase
         .from('documents')
         .select(`
           *,
-          employees:employee_id (
+          employees:employee_id!inner (
             nombres,
             apellidos,
-            dni
+            dni,
+            tenant_id
           )
         `)
+        .eq('employees.tenant_id', tenant.id)
         .order('generated_date', { ascending: false });
 
       if (error) throw error;
@@ -63,14 +73,16 @@ export const useDocuments = () => {
   };
 
   useEffect(() => {
-    fetchDocuments();
-  }, []);
+    if (tenant?.id) {
+      fetchDocuments();
+    }
+  }, [tenant?.id]);
 
   const addDocument = async (documentData: Omit<Document, 'id' | 'created_at' | 'updated_at'>) => {
     try {
       const { data, error } = await supabase
         .from('documents')
-        .insert([documentData])
+        .insert([{ ...documentData, tenant_id: tenant?.id }])
         .select()
         .single();
 

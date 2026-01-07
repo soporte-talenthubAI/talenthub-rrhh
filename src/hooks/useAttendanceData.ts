@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface AttendanceRecord {
   id: string;
@@ -19,12 +20,20 @@ export const useAttendanceData = () => {
   const [records, setRecords] = useState<AttendanceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchRecords = async () => {
+    if (!tenant?.id) {
+      setRecords([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('attendance')
         .select('*')
+        .eq('tenant_id', tenant.id)
         .order('fecha', { ascending: false });
 
       if (error) throw error;
@@ -45,7 +54,7 @@ export const useAttendanceData = () => {
     try {
       const { data, error } = await supabase
         .from('attendance')
-        .insert([record])
+        .insert([{ ...record, tenant_id: tenant?.id }])
         .select()
         .single();
 
@@ -66,9 +75,10 @@ export const useAttendanceData = () => {
 
   const bulkInsert = async (records: Omit<AttendanceRecord, 'id' | 'created_at' | 'updated_at'>[]) => {
     try {
+      const recordsWithTenant = records.map(r => ({ ...r, tenant_id: tenant?.id }));
       const { data, error } = await supabase
         .from('attendance')
-        .insert(records)
+        .insert(recordsWithTenant)
         .select();
 
       if (error) throw error;
@@ -138,7 +148,9 @@ export const useAttendanceData = () => {
   };
 
   useEffect(() => {
-    fetchRecords();
+    if (tenant?.id) {
+      fetchRecords();
+    }
 
     // Set up real-time subscription
     const channel = supabase
@@ -151,7 +163,7 @@ export const useAttendanceData = () => {
           table: 'attendance'
         },
         () => {
-          fetchRecords();
+          if (tenant?.id) fetchRecords();
         }
       )
       .subscribe();
@@ -159,7 +171,7 @@ export const useAttendanceData = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [tenant?.id]);
 
   return {
     records,

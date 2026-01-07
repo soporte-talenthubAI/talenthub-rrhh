@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface PerformanceStats {
   totalEvaluations: number;
@@ -20,12 +21,27 @@ export const usePerformanceStats = () => {
     needsImprovement: 0
   });
   const [loading, setLoading] = useState(true);
+  const { tenant } = useTenant();
 
   const fetchPerformanceStats = async () => {
+    if (!tenant?.id) {
+      setStats({
+        totalEvaluations: 0,
+        completedEvaluations: 0,
+        inProgressEvaluations: 0,
+        averageScore: 0,
+        highPerformers: 0,
+        needsImprovement: 0
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await (supabase as any)
         .from('performance_evaluations')
-        .select('estado, puntuacion_general');
+        .select('estado, puntuacion_general')
+        .eq('tenant_id', tenant.id);
 
       if (error) throw error;
 
@@ -58,7 +74,9 @@ export const usePerformanceStats = () => {
   };
 
   useEffect(() => {
-    fetchPerformanceStats();
+    if (tenant?.id) {
+      fetchPerformanceStats();
+    }
 
     // Set up real-time subscription
     const channel = (supabase as any)
@@ -71,7 +89,7 @@ export const usePerformanceStats = () => {
           table: 'performance_evaluations'
         },
         () => {
-          fetchPerformanceStats();
+          if (tenant?.id) fetchPerformanceStats();
         }
       )
       .subscribe();
@@ -79,7 +97,7 @@ export const usePerformanceStats = () => {
     return () => {
       (supabase as any).removeChannel(channel);
     };
-  }, []);
+  }, [tenant?.id]);
 
   return {
     stats,

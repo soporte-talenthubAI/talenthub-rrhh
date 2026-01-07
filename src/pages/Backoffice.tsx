@@ -1023,7 +1023,7 @@ const Backoffice = () => {
 
           {/* Branding / Configuración de Empresa Tab */}
           <TabsContent value="branding">
-            <ClientConfigEditor />
+            <ClientConfigEditor tenantId={selectedClientId} />
           </TabsContent>
         </Tabs>
       </main>

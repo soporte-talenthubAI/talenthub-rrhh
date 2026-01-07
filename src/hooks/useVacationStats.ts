@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface VacationStats {
   totalUsedDays: number;
@@ -16,15 +17,28 @@ export const useVacationStats = () => {
     averageUsedDays: 0
   });
   const [loading, setLoading] = useState(true);
+  const { tenant } = useTenant();
 
   const fetchVacationStats = async () => {
+    if (!tenant?.id) {
+      setStats({
+        totalUsedDays: 0,
+        totalAvailableDays: 0,
+        totalEmployees: 0,
+        averageUsedDays: 0
+      });
+      setLoading(false);
+      return;
+    }
+
     try {
       const currentYear = new Date().getFullYear();
       
-      // Get vacation balances for current year
+      // Get vacation balances for current year filtered by tenant
       const { data: balances, error: balancesError } = await supabase
         .from('vacation_balances')
         .select('*')
+        .eq('tenant_id', tenant.id)
         .eq('year', currentYear);
 
       if (balancesError) throw balancesError;
@@ -51,8 +65,10 @@ export const useVacationStats = () => {
   };
 
   useEffect(() => {
-    fetchVacationStats();
-  }, []);
+    if (tenant?.id) {
+      fetchVacationStats();
+    }
+  }, [tenant?.id]);
 
   return {
     stats,

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 // Temporary interface extension until migration is run and types are regenerated
 interface UniformRecord {
@@ -43,15 +44,23 @@ export const useUniforms = () => {
   const [uniforms, setUniforms] = useState<UniformDelivery[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const fetchUniforms = async () => {
+    if (!tenant?.id) {
+      setUniforms([]);
+      setLoading(false);
+      return;
+    }
+
     try {
       const { data, error } = await supabase
         .from('uniforms')
         .select(`
           *,
-          employees:employees (*)
+          employees:employees!inner (*, tenant_id)
         `)
+        .eq('employees.tenant_id', tenant.id)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
@@ -104,7 +113,8 @@ export const useUniforms = () => {
         condition: uniformData.condition,
         notes: uniformData.notes,
         galpon: uniformData.galpon,
-        status: uniformData.status
+        status: uniformData.status,
+        tenant_id: tenant?.id,
       };
 
       const { data, error } = await supabase
@@ -234,7 +244,9 @@ export const useUniforms = () => {
   };
 
   useEffect(() => {
-    fetchUniforms();
+    if (tenant?.id) {
+      fetchUniforms();
+    }
 
     // Set up real-time subscription
     const channel = supabase
@@ -247,7 +259,7 @@ export const useUniforms = () => {
           table: 'uniforms'
         },
         () => {
-          fetchUniforms();
+          if (tenant?.id) fetchUniforms();
         }
       )
       .subscribe();
@@ -255,7 +267,7 @@ export const useUniforms = () => {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, []);
+  }, [tenant?.id]);
 
   return {
     uniforms,
