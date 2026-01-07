@@ -98,7 +98,7 @@ serve(async (req) => {
       case 'invite_user':
         // Invitar usuario por email - requiere verificación
         // El usuario recibirá un email con link para establecer contraseña
-        const siteUrl = Deno.env.get('SITE_URL') || 'http://localhost:5173'
+        const siteUrl = Deno.env.get('SITE_URL') || 'https://talenthub-rrhh.vercel.app'
         
         const { data: inviteData, error: inviteError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
           email,
@@ -132,7 +132,7 @@ serve(async (req) => {
         const { data: resendData, error: resendError } = await supabaseAdmin.auth.admin.inviteUserByEmail(
           email,
           {
-            redirectTo: `${Deno.env.get('SITE_URL') || 'http://localhost:5173'}/set-password`,
+            redirectTo: `${Deno.env.get('SITE_URL') || 'https://talenthub-rrhh.vercel.app'}/set-password`,
           }
         )
         
