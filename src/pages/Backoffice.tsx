@@ -60,10 +60,12 @@ const Backoffice = () => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<TalentHubClient | null>(null);
   const [newClient, setNewClient] = useState({
-    nombre: '',
-    nombre_corto: '',
+    nombre: '', // Razón Social
+    nombre_corto: '', // Nombre Comercial / Fantasía
+    cuit: '', // CUIT/CUIL
     email_contacto: '',
     telefono: '',
+    direccion: '',
     plan: 'basic' as const,
     status: 'active' as const,
     email_admin: '', // Email del administrador para invitar
@@ -178,7 +180,16 @@ const Backoffice = () => {
     if (!newClient.nombre) {
       toast({
         title: "Error",
-        description: "El nombre del cliente es requerido",
+        description: "La razón social es requerida",
+        variant: "destructive",
+      });
+      return;
+    }
+
+    if (!newClient.email_admin) {
+      toast({
+        title: "Error",
+        description: "El email del administrador es requerido",
         variant: "destructive",
       });
       return;
@@ -190,8 +201,10 @@ const Backoffice = () => {
       const created = await createClient({
         nombre: newClient.nombre,
         nombre_corto: newClient.nombre_corto,
+        cuit: newClient.cuit,
         email_contacto: newClient.email_contacto || newClient.email_admin,
         telefono: newClient.telefono,
+        direccion: newClient.direccion,
         plan: newClient.plan,
         status: newClient.status,
       } as any);
@@ -214,7 +227,7 @@ const Backoffice = () => {
             action: 'invite_user',
             email: newClient.email_admin,
             tenantId: created.id,
-            role: 'admin',
+            role: 'rrhh', // Gestión de empleados
           }),
         });
 
@@ -228,7 +241,7 @@ const Backoffice = () => {
               user_id: result.user.id || null,
               tenant_id: created.id,
               email: newClient.email_admin,
-              role: 'admin',
+              role: 'rrhh', // Gestión de empleados
               is_active: true,
               invited_at: new Date().toISOString(),
             });
@@ -256,8 +269,10 @@ const Backoffice = () => {
       setNewClient({
         nombre: '',
         nombre_corto: '',
+        cuit: '',
         email_contacto: '',
         telefono: '',
+        direccion: '',
         plan: 'basic',
         status: 'active',
         email_admin: '',
@@ -583,95 +598,113 @@ const Backoffice = () => {
                           Nuevo Cliente
                         </Button>
                       </DialogTrigger>
-                      <DialogContent className="bg-slate-800 border-slate-700">
+                      <DialogContent className="bg-slate-800 border-slate-700 max-w-2xl">
                         <DialogHeader>
                           <DialogTitle className="text-white">Nuevo Cliente</DialogTitle>
                           <DialogDescription className="text-slate-400">
-                            Registra un nuevo cliente en el sistema
+                            Registra una nueva empresa en el sistema
                           </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4 pt-4">
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-slate-300">Nombre</Label>
-                              <Input
-                                value={newClient.nombre}
-                                onChange={(e) => setNewClient(prev => ({ ...prev, nombre: e.target.value }))}
-                                className="bg-slate-700 border-slate-600 text-white"
-                              />
+                          {/* Datos de la Empresa */}
+                          <div className="space-y-3">
+                            <h4 className="text-sm font-medium text-emerald-400">Datos de la Empresa</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">Razón Social *</Label>
+                                <Input
+                                  value={newClient.nombre}
+                                  onChange={(e) => setNewClient(prev => ({ ...prev, nombre: e.target.value }))}
+                                  placeholder="Empresa S.A."
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">Nombre Comercial</Label>
+                                <Input
+                                  value={newClient.nombre_corto}
+                                  onChange={(e) => setNewClient(prev => ({ ...prev, nombre_corto: e.target.value }))}
+                                  placeholder="Nombre de fantasía"
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">CUIT</Label>
+                                <Input
+                                  value={newClient.cuit}
+                                  onChange={(e) => setNewClient(prev => ({ ...prev, cuit: e.target.value }))}
+                                  placeholder="XX-XXXXXXXX-X"
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">Teléfono</Label>
+                                <Input
+                                  value={newClient.telefono}
+                                  onChange={(e) => setNewClient(prev => ({ ...prev, telefono: e.target.value }))}
+                                  placeholder="+54 11 1234-5678"
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
                             </div>
                             <div className="space-y-2">
-                              <Label className="text-slate-300">Nombre Corto</Label>
+                              <Label className="text-slate-300">Dirección</Label>
                               <Input
-                                value={newClient.nombre_corto}
-                                onChange={(e) => setNewClient(prev => ({ ...prev, nombre_corto: e.target.value }))}
+                                value={newClient.direccion}
+                                onChange={(e) => setNewClient(prev => ({ ...prev, direccion: e.target.value }))}
+                                placeholder="Calle 123, Ciudad, Provincia"
                                 className="bg-slate-700 border-slate-600 text-white"
                               />
                             </div>
                           </div>
-                          <div className="grid grid-cols-2 gap-4">
+
+                          {/* Contacto y Plan */}
+                          <div className="space-y-3 border-t border-slate-700 pt-4">
+                            <h4 className="text-sm font-medium text-emerald-400">Contacto y Plan</h4>
+                            <div className="grid grid-cols-2 gap-4">
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">Email de Contacto</Label>
+                                <Input
+                                  type="email"
+                                  value={newClient.email_contacto}
+                                  onChange={(e) => setNewClient(prev => ({ ...prev, email_contacto: e.target.value }))}
+                                  placeholder="contacto@empresa.com"
+                                  className="bg-slate-700 border-slate-600 text-white"
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label className="text-slate-300">Plan</Label>
+                                <Select
+                                  value={newClient.plan}
+                                  onValueChange={(v) => setNewClient(prev => ({ ...prev, plan: v as any }))}
+                                >
+                                  <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
+                                    <SelectValue />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    <SelectItem value="basic">Basic</SelectItem>
+                                    <SelectItem value="professional">Professional</SelectItem>
+                                    <SelectItem value="enterprise">Enterprise</SelectItem>
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Usuario de Gestión */}
+                          <div className="space-y-3 border-t border-slate-700 pt-4">
+                            <h4 className="text-sm font-medium text-emerald-400">Usuario de Gestión (RRHH)</h4>
                             <div className="space-y-2">
-                              <Label className="text-slate-300">Email</Label>
+                              <Label className="text-slate-300">Email del Usuario *</Label>
                               <Input
                                 type="email"
-                                value={newClient.email_contacto}
-                                onChange={(e) => setNewClient(prev => ({ ...prev, email_contacto: e.target.value }))}
+                                value={newClient.email_admin}
+                                onChange={(e) => setNewClient(prev => ({ ...prev, email_admin: e.target.value }))}
+                                placeholder="rrhh@empresa.com"
                                 className="bg-slate-700 border-slate-600 text-white"
                               />
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-slate-300">Teléfono</Label>
-                              <Input
-                                value={newClient.telefono}
-                                onChange={(e) => setNewClient(prev => ({ ...prev, telefono: e.target.value }))}
-                                className="bg-slate-700 border-slate-600 text-white"
-                              />
-                            </div>
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div className="space-y-2">
-                              <Label className="text-slate-300">Plan</Label>
-                              <Select
-                                value={newClient.plan}
-                                onValueChange={(v) => setNewClient(prev => ({ ...prev, plan: v as any }))}
-                              >
-                                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="basic">Basic</SelectItem>
-                                  <SelectItem value="professional">Professional</SelectItem>
-                                  <SelectItem value="enterprise">Enterprise</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div className="space-y-2">
-                              <Label className="text-slate-300">Estado</Label>
-                              <Select
-                                value={newClient.status}
-                                onValueChange={(v) => setNewClient(prev => ({ ...prev, status: v as any }))}
-                              >
-                                <SelectTrigger className="bg-slate-700 border-slate-600 text-white">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="active">Activo</SelectItem>
-                                  <SelectItem value="trial">Prueba</SelectItem>
-                                  <SelectItem value="suspended">Suspendido</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                          </div>
-                          {/* Email del Administrador */}
-                          <div className="space-y-2 border-t border-slate-700 pt-4">
-                            <Label className="text-slate-300">Email del Administrador (opcional)</Label>
-                            <Input
-                              type="email"
-                              value={newClient.email_admin}
-                              onChange={(e) => setNewClient(prev => ({ ...prev, email_admin: e.target.value }))}
-                              placeholder="admin@empresa.com"
-                              className="bg-slate-700 border-slate-600 text-white"
-                            />
                             <p className="text-xs text-slate-500">
                               Se enviará una invitación por email para que el administrador establezca su contraseña
                             </p>
