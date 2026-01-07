@@ -2,7 +2,7 @@
  * Panel de Administración TalentHub (Backoffice)
  *
  * Acceso: /backoffice
- * Login: soporte@talenthub.com / TalentHub2024!
+ * Login: Usuarios registrados en talenthub_admins + Supabase Auth
  *
  * Funcionalidades:
  * - Gestionar clientes (CRUD)
@@ -87,18 +87,17 @@ const Backoffice = () => {
     }
   }, [clients, selectedClientId]);
 
-  // Login handler
+  // Login handler - usa Supabase Auth
   const handleLogin = async () => {
     setAuthLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('talenthub_admins')
-        .select('*')
-        .eq('email', loginData.email)
-        .eq('is_active', true)
-        .single();
+      // 1. Autenticar con Supabase Auth
+      const { data: authData, error: authError } = await supabase.auth.signInWithPassword({
+        email: loginData.email,
+        password: loginData.password,
+      });
 
-      if (error || !data) {
+      if (authError || !authData.user) {
         toast({
           title: "Error de autenticación",
           description: "Credenciales inválidas",
@@ -107,31 +106,43 @@ const Backoffice = () => {
         return;
       }
 
-      if (loginData.password === 'TalentHub2024!' && data.email === 'soporte@talenthub.com') {
-        localStorage.setItem('backoffice_auth', JSON.stringify({
-          id: data.id,
-          email: data.email,
-          nombre: data.nombre,
-          role: data.role
-        }));
+      // 2. Verificar que sea admin de TalentHub
+      const { data: adminData, error: adminError } = await supabase
+        .from('talenthub_admins')
+        .select('*')
+        .eq('email', authData.user.email)
+        .eq('is_active', true)
+        .single();
 
-        await supabase
-          .from('talenthub_admins')
-          .update({ last_login: new Date().toISOString() })
-          .eq('id', data.id);
-
-        setIsAuthenticated(true);
+      if (adminError || !adminData) {
+        // No es admin, cerrar sesión
+        await supabase.auth.signOut();
         toast({
-          title: "Bienvenido",
-          description: `Hola ${data.nombre}, has iniciado sesión correctamente`,
-        });
-      } else {
-        toast({
-          title: "Error de autenticación",
-          description: "Credenciales inválidas",
+          title: "Acceso denegado",
+          description: "No tienes permisos de administrador",
           variant: "destructive",
         });
+        return;
       }
+
+      // 3. Guardar en localStorage y actualizar last_login
+      localStorage.setItem('backoffice_auth', JSON.stringify({
+        id: adminData.id,
+        email: adminData.email,
+        nombre: adminData.nombre,
+        role: adminData.role
+      }));
+
+      await supabase
+        .from('talenthub_admins')
+        .update({ last_login: new Date().toISOString() })
+        .eq('id', adminData.id);
+
+      setIsAuthenticated(true);
+      toast({
+        title: "Bienvenido",
+        description: `Hola ${adminData.nombre}, has iniciado sesión correctamente`,
+      });
     } catch (error) {
       console.error('Login error:', error);
       toast({
