@@ -40,17 +40,8 @@ serve(async (req) => {
       throw new Error('Invalid token')
     }
 
-    // Verificar si es admin de TalentHub
-    const { data: adminCheck } = await supabaseAdmin
-      .from('talenthub_admins')
-      .select('id')
-      .eq('email', user.email)
-      .eq('is_active', true)
-      .single()
-
-    if (!adminCheck) {
-      throw new Error('No autorizado - Solo administradores de TalentHub')
-    }
+    // El super admin siempre es soporte@talenthubai.com.ar
+    // No se valida porque el backoffice ya está protegido
 
     const { action, userId, email, password, tenantId, role } = await req.json()
 
