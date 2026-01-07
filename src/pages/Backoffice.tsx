@@ -705,9 +705,10 @@ const Backoffice = () => {
                                 placeholder="rrhh@empresa.com"
                                 className="bg-slate-700 border-slate-600 text-white"
                               />
-                            <p className="text-xs text-slate-500">
-                              Se enviará una invitación por email para que el administrador establezca su contraseña
-                            </p>
+                              <p className="text-xs text-slate-500">
+                                Se enviará una invitación por email para que establezca su contraseña
+                              </p>
+                            </div>
                           </div>
                           <Button 
                             onClick={handleCreateClient} 
