@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { useTenant } from '@/contexts/TenantContext';
 
 export interface Employee {
   id: string;
@@ -49,6 +50,7 @@ export const useEmployees = () => {
   const [employees, setEmployees] = useState<Employee[]>([]);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
+  const { tenant } = useTenant();
 
   const toDbEmployee = (input: Partial<Employee>) => {
     // Helper function to safely convert to number or null
@@ -101,10 +103,17 @@ export const useEmployees = () => {
 
   const fetchEmployees = async () => {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('employees')
         .select('*')
         .order('apellidos', { ascending: true });
+
+      // Filtrar por tenant si existe
+      if (tenant?.id) {
+        query = query.eq('tenant_id', tenant.id);
+      }
+
+      const { data, error } = await query;
 
       if (error) throw error;
       
@@ -154,7 +163,14 @@ export const useEmployees = () => {
         throw new Error('Los campos DNI, nombres, apellidos y fecha de ingreso son obligatorios');
       }
 
-      const dbEmployee = toDbEmployee(employeeData);
+      if (!tenant?.id) {
+        throw new Error('No hay tenant seleccionado');
+      }
+
+      const dbEmployee = {
+        ...toDbEmployee(employeeData),
+        tenant_id: tenant.id, // Asignar al tenant actual
+      };
       const { data, error } = await supabase
         .from('employees')
         .insert([dbEmployee] as any)
@@ -390,8 +406,10 @@ export const useEmployees = () => {
   };
 
   useEffect(() => {
-    fetchEmployees();
-  }, []);
+    if (tenant?.id) {
+      fetchEmployees();
+    }
+  }, [tenant?.id]);
 
   return {
     employees,
